@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Test output
+coverage/
+
+# Vercel
+.vercel/
+
+# Env files (never commit secrets). .env.example is tracked.
+.env
+.env*.local
+.env.*
+!.env.example
+
+# Local JSM HQ / agent files (hold an HQ auth token)
+.claude/settings.local.json
+.claude/hq-mcp.json
+.jsmhq-role.md
+.jsmhq-hook.mjs
+
+# OS / editor
+.DS_Store
+*.log
