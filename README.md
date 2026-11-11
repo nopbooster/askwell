@@ -31,3 +31,14 @@ pnpm dev                     # http://localhost:3000
 | `pnpm test` | Vitest across all packages |
 | `pnpm build` | Build every package (Next.js app + widget bundle) |
 | `pnpm db:types` | Stub; wired to Supabase in Phase 1 |
+
+## Deployments
+
+| | |
+|---|---|
+| Host | Vercel. The project's Root Directory is `apps/web`. |
+| Pull requests | Every PR gets a Vercel preview deployment. From Phase 1 on, previews use the Supabase dev project. |
+| `main` | Every merge builds production, but automatic promotion is off. Only the product owner promotes a build to production. |
+| Protection | Previews are protected. Automated requests must send the `x-vercel-protection-bypass` header with the value of `VERCEL_AUTOMATION_BYPASS_SECRET` (browser tests also send `x-vercel-set-bypass-cookie: true` on the first request). Never commit the secret. |
+
+Get a preview's URL from GitHub (the Vercel comment on the PR, or the PR's deployment status), not from the branch name.
