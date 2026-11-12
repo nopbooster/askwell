@@ -9,7 +9,7 @@ import {
 import { getOwnerPlan } from "../../../../lib/accounts";
 import { createOwnerClient } from "../../../../lib/supabase/owner";
 import { toProject } from "../../../../lib/projects";
-import { apiError, internalError, readJson } from "../../../../lib/projects/http";
+import { apiError, internalError, readJson } from "../../../../lib/api/http";
 
 type Context = { params: Promise<{ id: string }> };
 

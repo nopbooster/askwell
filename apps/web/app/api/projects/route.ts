@@ -10,7 +10,7 @@ import { ensureAccount, getOwnerPlan } from "../../../lib/accounts";
 import { createOwnerClient } from "../../../lib/supabase/owner";
 import { createServiceClient } from "../../../lib/supabase/service";
 import { toProject } from "../../../lib/projects";
-import { apiError, internalError, readJson } from "../../../lib/projects/http";
+import { apiError, internalError, readJson } from "../../../lib/api/http";
 
 /**
  * GET /api/projects: the owner's projects, newest first. Owner client, so RLS scopes the rows.
