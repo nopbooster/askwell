@@ -31,6 +31,8 @@ A plain HTML page that plays the part of a customer site, on another origin. Use
 3. Serve the folder on another origin: `npx serve apps/widget/demo -l 5500`, then open http://localhost:5500.
 4. Check: the chat button shows in the bottom-right corner; click it, send a message, see the typing state and a mock reply; the panel's close button hides it. A wrong `data-key` renders nothing and leaves the page untouched.
 
+Preview deployments are protected by Vercel. A browser test must add the `x-vercel-protection-bypass` header per request (Playwright `context.route`, not `setExtraHTTPHeaders`: the latter makes the browser preflight the config fetch, and Vercel redirects the preflight).
+
 Don't commit your snippet (the key is public, but the page should stay a clean template).
 
 ## Commands
