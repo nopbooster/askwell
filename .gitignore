@@ -30,3 +30,6 @@ coverage/
 # OS / editor
 .DS_Store
 *.log
+
+# Built from apps/widget by apps/web/scripts/copy-widget.mjs
+apps/web/public/widget.js
