@@ -85,7 +85,40 @@ describe("getOwnerPlan", () => {
     await expect(getOwnerPlan()).resolves.toEqual({ status: "ok", plan: "free" });
     expect(createOwnerClient).toHaveBeenCalledTimes(1);
     expect(ownerFrom).toHaveBeenCalledWith("accounts");
-    expect(serviceFrom).not.toHaveBeenCalled();
+    // The service client only ensures the row; the plan itself is read through the owner client.
+    expect(serviceFrom.mock.calls.every(([t]) => t === "accounts")).toBe(true);
+    expect(upsert.mock.calls.every(([row]) => !("plan" in row))).toBe(true);
+  });
+
+  it("waits for the account insert before reading (new user's first load)", async () => {
+    // The insert is slow; the owner read only sees the row once the insert has finished.
+    let finishInsert: () => void = () => {};
+    upsert.mockImplementationOnce(
+      (row) =>
+        new Promise<UpsertResult>((resolve) => {
+          finishInsert = () => {
+            rows.set(row.clerk_user_id, { plan: "free", ...row });
+            resolve({ error: null });
+          };
+        }),
+    );
+    ownerResult.mockImplementation(() => {
+      const row = rows.get("user_1");
+      return row ? { data: { plan: row.plan }, error: null } : { data: null, error: null };
+    });
+
+    const plan = getOwnerPlan(); // starts before the insert finishes, without calling ensureAccount itself
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ownerResult).not.toHaveBeenCalled(); // no read yet
+    finishInsert();
+    await expect(plan).resolves.toEqual({ status: "ok", plan: "free" });
+  });
+
+  it("returns an error state when the account can't be created, without guessing Free", async () => {
+    upsert.mockResolvedValueOnce({ error: { message: "boom" } });
+    await expect(getOwnerPlan()).resolves.toEqual({ status: "error" });
+    expect(ownerResult).not.toHaveBeenCalled();
   });
 
   it("returns pro for a pro account", async () => {
