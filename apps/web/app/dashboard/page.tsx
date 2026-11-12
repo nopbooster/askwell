@@ -1,12 +1,13 @@
-import { UserButton } from "@clerk/nextjs";
+import type { Metadata } from "next";
+import { EmptyState, PageHeader } from "../../components/ui";
 
-export default function DashboardPage() {
+export const metadata: Metadata = { title: "Projects" };
+
+export default function Page() {
   return (
-    <main className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <UserButton />
-      </div>
-    </main>
+    <>
+      <PageHeader title="Projects" description="Your chat widgets, one per website." />
+      <EmptyState title="No projects yet" description="You'll create one here soon." />
+    </>
   );
 }

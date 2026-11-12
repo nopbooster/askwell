@@ -1,1 +1,91 @@
 @import "tailwindcss";
+
+/*
+ * Design tokens (project.md §13). One black-and-white palette.
+ * Dashboard is light (default). Any scope with the `dark` class (the landing
+ * page) switches the same semantic tokens to the dark look.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Palette: neutral scale only */
+  --color-ink-0: #ffffff;
+  --color-ink-50: #fafafa;
+  --color-ink-100: #f4f4f5;
+  --color-ink-200: #e4e4e7;
+  --color-ink-300: #d4d4d8;
+  --color-ink-500: #71717a;
+  --color-ink-700: #3f3f46;
+  --color-ink-900: #18181b;
+  --color-ink-950: #09090b;
+
+  /* Semantic tokens: components use these, never the palette directly */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+
+  /* Radius */
+  --radius-control: 0.625rem;
+  --radius-panel: 1.25rem;
+
+  /* Shadows */
+  --shadow-glass: 0 1px 0 0 var(--glass-highlight) inset, 0 8px 32px -8px var(--shadow-color);
+  --shadow-raised: 0 2px 8px -2px var(--shadow-color);
+
+  /* Blur */
+  --blur-glass: 16px;
+}
+
+:root {
+  color-scheme: light;
+  --canvas: #f4f4f5;
+  --surface: rgb(255 255 255 / 0.6);
+  --surface-strong: rgb(255 255 255 / 0.85);
+  --line: rgb(0 0 0 / 0.08);
+  --fg: #09090b;
+  --fg-muted: #52525b;
+  --accent: #09090b;
+  --accent-fg: #ffffff;
+  --danger: #b91c1c;
+  --glass-highlight: rgb(255 255 255 / 0.8);
+  --shadow-color: rgb(0 0 0 / 0.12);
+}
+
+.dark {
+  color-scheme: dark;
+  --canvas: #09090b;
+  --surface: rgb(255 255 255 / 0.06);
+  --surface-strong: rgb(255 255 255 / 0.12);
+  --line: rgb(255 255 255 / 0.14);
+  --fg: #fafafa;
+  --fg-muted: #a1a1aa;
+  --accent: #fafafa;
+  --accent-fg: #09090b;
+  --danger: #f87171;
+  --glass-highlight: rgb(255 255 255 / 0.12);
+  --shadow-color: rgb(0 0 0 / 0.5);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+/* Glass surface: translucent fill + backdrop blur */
+@utility glass {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+}
