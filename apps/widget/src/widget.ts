@@ -143,6 +143,9 @@ export async function init(
       dot.classList.toggle("on", m.count > 0 && !isOpen());
   });
 
-  document.body.append(host);
+  // An async script in <head> can run before <body> exists.
+  const mount = () => document.body.append(host);
+  if (document.body) mount();
+  else document.addEventListener("DOMContentLoaded", mount, { once: true });
   return { host, root, iframe: () => frame };
 }

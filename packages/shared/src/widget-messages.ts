@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APP_NAME } from "./index";
+import { APP_NAME } from "./app";
 
 /**
  * postMessage protocol between the panel (`/embed`, inside the iframe) and the loader

@@ -139,6 +139,28 @@ describe("start-up", () => {
   });
 });
 
+describe("mounting", () => {
+  it("waits for <body> when the script runs from <head>", async () => {
+    const body = document.body;
+    const getter = vi
+      .spyOn(document, "body", "get")
+      .mockReturnValue(null as unknown as HTMLElement);
+    mockFetch(() => ok(config));
+    const h = await init(scriptTag());
+    if (!h) throw new Error("widget did not start");
+    expect(body.contains(h.host)).toBe(false); // nothing mounted yet, and no crash
+    getter.mockRestore();
+    document.dispatchEvent(new Event("DOMContentLoaded"));
+    expect(document.body.contains(h.host)).toBe(true);
+    expect(document.body.querySelectorAll("div")).toHaveLength(1);
+  });
+
+  it("mounts straight away when <body> exists", async () => {
+    const h = await start();
+    expect(document.body.contains(h.host)).toBe(true);
+  });
+});
+
 describe("button", () => {
   it("adds exactly one host element and keeps everything in the shadow root", async () => {
     const h = await start();

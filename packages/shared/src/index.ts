@@ -1,4 +1,4 @@
-export const APP_NAME = "Askwell";
+export * from "./app";
 
 export * from "./plans";
 export * from "./constants";
