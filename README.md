@@ -19,7 +19,8 @@ pnpm dev                     # http://localhost:3000
 | `apps/web` | Next.js app (App Router, Tailwind v4) |
 | `apps/widget` | Vanilla TS loader, bundled by esbuild to `apps/widget/dist/widget.js` |
 | `packages/shared` | `@askwell/shared`: the shared contract |
-| `packages/db` | `@askwell/db`: database types and test helpers (Phase 1) |
+| `packages/db` | `@askwell/db`: database types and the pglite test helper (`@askwell/db/supabase-pglite`, tests only) |
+| `supabase` | `config.toml` and `migrations/` (SQL files, `<UTC timestamp>_<name>.sql`). No local Supabase stack. |
 
 ## Commands
 
@@ -30,7 +31,7 @@ pnpm dev                     # http://localhost:3000
 | `pnpm lint` | ESLint (one flat config at the root) |
 | `pnpm test` | Vitest across all packages |
 | `pnpm build` | Build every package (Next.js app + widget bundle) |
-| `pnpm db:types` | Stub; wired to Supabase in Phase 1 |
+| `pnpm db:types` | Regenerate `packages/db/types.ts` from the Supabase dev project. Needs `SUPABASE_PROJECT_ID` and `SUPABASE_ACCESS_TOKEN` in your shell (tooling variables, not in `.env.example`). Agents use the Supabase MCP's type generator instead. |
 
 ## Deployments
 

@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "build": "pnpm -r build",
-    "db:types": "echo \"db:types: set up in Phase 1\""
+    "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > packages/db/types.ts.tmp && mv packages/db/types.ts.tmp packages/db/types.ts || (rm -f packages/db/types.ts.tmp; exit 1)"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -20,6 +20,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.6",
     "globals": "^17.14.0",
+    "supabase": "^3.1.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
