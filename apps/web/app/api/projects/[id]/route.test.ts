@@ -18,7 +18,10 @@ vi.mock("../../../../lib/supabase/owner", () => ({
 }));
 
 const serviceFrom = vi.fn();
-vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from: serviceFrom }) }));
+const bucket = { list: vi.fn(), remove: vi.fn() };
+vi.mock("../../../../lib/supabase/service", () => ({
+  createServiceClient: () => ({ from: serviceFrom, storage: { from: () => bucket } }),
+}));
 
 import { DELETE, PATCH } from "./route";
 
@@ -43,6 +46,8 @@ beforeEach(() => {
   ownerResult = { data: ROW, error: null };
   ownerFrom.mockClear();
   serviceFrom.mockReset();
+  bucket.list.mockReset().mockResolvedValue({ data: [], error: null });
+  bucket.remove.mockReset().mockResolvedValue({ data: [], error: null });
 });
 
 describe("PATCH /api/projects/:id", () => {
@@ -91,11 +96,33 @@ describe("DELETE /api/projects/:id", () => {
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 
-  it("404 when no row was deleted (missing or another owner's id)", async () => {
+  it("404 for a missing or another owner's project, and never touches Storage", async () => {
     ownerResult = { data: null, error: null };
     const res = await del(ID);
     expect(res.status).toBe(404);
     expect(ApiErrorSchema.parse(await res.json()).error.code).toBe("not_found");
+    expect(bucket.list).not.toHaveBeenCalled();
+    expect(bucket.remove).not.toHaveBeenCalled();
+  });
+
+  it("removes the project's files (everything under <projectId>/) before deleting the row", async () => {
+    ownerResult = { data: { id: ID }, error: null };
+    bucket.list
+      .mockResolvedValueOnce({ data: [{ name: "a.pdf" }, { name: "b.txt" }], error: null })
+      .mockResolvedValueOnce({ data: [], error: null });
+    const res = await del(ID);
+    expect(res.status).toBe(200);
+    expect(bucket.list).toHaveBeenCalledWith(ID, expect.objectContaining({ limit: expect.any(Number) }));
+    expect(bucket.remove).toHaveBeenCalledWith([`${ID}/a.pdf`, `${ID}/b.txt`]);
+    expect(last.calls.delete).toHaveLength(1);
+  });
+
+  it("500 and keeps the project when Storage fails, so a retry can finish the job", async () => {
+    ownerResult = { data: { id: ID }, error: null };
+    bucket.list.mockResolvedValue({ data: null, error: { message: "storage down" } });
+    const res = await del(ID);
+    expect(res.status).toBe(500);
+    expect(last.calls.delete).toBeUndefined();
   });
 
   it("400 for a malformed id, without touching the database", async () => {
