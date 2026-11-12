@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { PLAN_LIMITS, type Plan, type Project } from "@askwell/shared";
 import type { Database } from "@askwell/db";
 import { createOwnerClient } from "../supabase/owner";
@@ -32,3 +33,17 @@ export async function getOwnedProject(id: string): Promise<ProjectRow | null> {
   if (error) throw new Error(`getOwnedProject: read failed (${error.message})`);
   return data;
 }
+
+/**
+ * The signed-in owner's projects, newest first. Owner client, so RLS scopes the rows.
+ * Server components read through this (never a fetch to our own API). Cached per request, so the
+ * layout and the page share one query. Throws on a database error.
+ */
+export const listOwnedProjects = cache(async (): Promise<ProjectRow[]> => {
+  const { data, error } = await (await createOwnerClient())
+    .from("projects")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`listOwnedProjects: read failed (${error.message})`);
+  return data;
+});
