@@ -4,7 +4,8 @@
  *
  * Stubbed: roles (anon / authenticated / service_role), Supabase's default grants on
  * schema `public`, schema `auth` (jwt(), uid(), role()), schema `extensions` with
- * pgvector and pgcrypto. Not stubbed: Storage, Realtime, PostgREST itself.
+ * pgvector and pgcrypto, and a minimal schema `storage` (buckets, objects) with RLS on objects and
+ * no policies, as on Supabase. Not stubbed: Storage's API, Realtime, PostgREST itself.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -57,6 +58,29 @@ $$;
 
 grant usage on schema public, extensions, auth to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;
+
+-- Minimal Storage: just enough for migrations that create buckets. Like Supabase, RLS is on for
+-- objects and the API roles hold table grants, so only policies could open anything up.
+create schema storage;
+create table storage.buckets (
+  id text primary key,
+  name text not null unique,
+  public boolean default false,
+  file_size_limit bigint,
+  allowed_mime_types text[],
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create table storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text,
+  created_at timestamptz default now()
+);
+alter table storage.buckets enable row level security;
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
+grant all on all tables in schema storage to anon, authenticated, service_role;
 
 -- Supabase's defaults: everything the postgres role creates in public is open to the
 -- API roles. RLS and explicit REVOKEs in migrations are the only boundary.
