@@ -45,9 +45,13 @@ function NavList({ items }: { items: NavItem[] }) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  // The menu is open only for the path it was opened on, so navigating closes it.
-  const [openAt, setOpenAt] = useState<string | null>(null);
-  const open = openAt === pathname;
+  const [open, setOpen] = useState(false);
+  // Navigating closes the menu. Reset during render (not in an effect) so it never flashes open.
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    setOpen(false);
+  }
   const items = getNavItems(pathname);
 
   return (
@@ -60,7 +64,7 @@ export function Sidebar() {
             variant="secondary"
             aria-expanded={open}
             aria-controls="dashboard-nav"
-            onClick={() => setOpenAt(open ? null : pathname)}
+            onClick={() => setOpen(!open)}
           >
             {open ? "Close" : "Menu"}
           </Button>
