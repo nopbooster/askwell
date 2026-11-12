@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { APP_NAME } from "@askwell/shared";
+import { ThemeToggle } from "../theme/theme-toggle";
 import { Button } from "../ui/button";
 import { getNavItems, type NavItem, type NavProject } from "./nav";
 
@@ -39,7 +40,13 @@ function NavList({ items, nested = false }: { items: NavItem[]; nested?: boolean
   );
 }
 
-export function Sidebar({ badge, projects = [] }: { badge?: ReactNode; projects?: readonly NavProject[] }) {
+export function Sidebar({
+  badge,
+  projects = [],
+}: {
+  badge?: ReactNode;
+  projects?: readonly NavProject[];
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   // Navigating closes the menu. Reset during render (not in an effect) so it never flashes open.
@@ -80,6 +87,7 @@ export function Sidebar({ badge, projects = [] }: { badge?: ReactNode; projects?
         <nav aria-label="Dashboard" className="flex-1">
           <NavList items={items} />
         </nav>
+        <ThemeToggle />
         <div className="hidden items-center gap-2 px-3 md:flex">
           <UserButton />
           {badge}

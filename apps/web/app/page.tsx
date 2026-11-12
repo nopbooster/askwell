@@ -9,7 +9,7 @@ import { PricingSection } from "../components/landing/pricing-section";
 
 export default function HomePage() {
   return (
-    <AuthProvider>
+    <AuthProvider alwaysDark>
       <div className="dark min-h-screen overflow-x-clip bg-canvas text-fg">
         <LandingHeader />
         <main>
