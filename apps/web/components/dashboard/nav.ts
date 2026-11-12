@@ -2,10 +2,15 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
+  /** This exact page (or tab) is open. */
   active: boolean;
-  /** Tabs of the current project, nested under "Projects". Empty outside a project. */
+  /** This item, or something under it, is open. Used to emphasise the open project. */
+  current: boolean;
+  /** Projects under "Projects"; the open project's tabs under that project. */
   children: NavItem[];
 };
+
+export type NavProject = { id: string; name: string };
 
 export const PROJECT_TABS = [
   { key: "knowledge", label: "Knowledge" },
@@ -27,15 +32,39 @@ function isAt(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Sidebar items for the current path. Project tabs appear only inside a project. */
-export function getNavItems(pathname: string, projectId: string | null = getProjectId(pathname)): NavItem[] {
-  const children: NavItem[] =
-    projectId === null
-      ? []
-      : PROJECT_TABS.map((tab) => {
-          const href = `/dashboard/p/${projectId}/${tab.key}`;
-          return { key: tab.key, label: tab.label, href, active: isAt(pathname, href), children: [] };
-        });
+function projectTabs(pathname: string, projectId: string): NavItem[] {
+  return PROJECT_TABS.map((tab) => {
+    const href = `/dashboard/p/${projectId}/${tab.key}`;
+    const active = isAt(pathname, href);
+    return { key: tab.key, label: tab.label, href, active, current: active, children: [] };
+  });
+}
+
+/**
+ * Sidebar items for the current path: Projects (the owner's real projects, newest first, with the
+ * open project's tabs nested under it) and Billing. A project open but missing from `projects`
+ * (a stale list) is still shown, so its tabs never disappear.
+ */
+export function getNavItems(
+  pathname: string,
+  projects: readonly NavProject[] = [],
+  projectId: string | null = getProjectId(pathname),
+): NavItem[] {
+  const entries: NavProject[] = [...projects];
+  if (projectId !== null && !entries.some((p) => p.id === projectId)) {
+    entries.unshift({ id: projectId, name: "Project" });
+  }
+  const children: NavItem[] = entries.map((project) => {
+    const tabs = project.id === projectId ? projectTabs(pathname, project.id) : [];
+    return {
+      key: `project-${project.id}`,
+      label: project.name,
+      href: `/dashboard/p/${project.id}/knowledge`,
+      active: false,
+      current: project.id === projectId,
+      children: tabs,
+    };
+  });
 
   return [
     {
@@ -43,6 +72,7 @@ export function getNavItems(pathname: string, projectId: string | null = getProj
       label: "Projects",
       href: "/dashboard",
       active: pathname === "/dashboard",
+      current: pathname === "/dashboard" || projectId !== null,
       children,
     },
     {
@@ -50,6 +80,7 @@ export function getNavItems(pathname: string, projectId: string | null = getProj
       label: "Billing",
       href: "/dashboard/billing",
       active: isAt(pathname, "/dashboard/billing"),
+      current: isAt(pathname, "/dashboard/billing"),
       children: [],
     },
   ];

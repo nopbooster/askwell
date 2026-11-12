@@ -6,44 +6,40 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { APP_NAME } from "@askwell/shared";
 import { Button } from "../ui/button";
-import { getNavItems, type NavItem } from "./nav";
+import { getNavItems, type NavItem, type NavProject } from "./nav";
 
-function NavLink({ item, nested = false }: { item: NavItem; nested?: boolean }) {
+function NavLink({ item }: { item: NavItem }) {
+  const style = item.active
+    ? "bg-accent font-medium text-accent-fg"
+    : item.current
+      ? "font-medium text-fg hover:bg-surface-strong"
+      : "text-fg-muted hover:bg-surface-strong hover:text-fg";
   return (
     <Link
       href={item.href}
       aria-current={item.active ? "page" : undefined}
-      className={`block rounded-control px-3 py-2 text-sm transition ${nested ? "ml-3" : ""} ${
-        item.active ? "bg-accent font-medium text-accent-fg" : "text-fg-muted hover:bg-surface-strong hover:text-fg"
-      }`}
+      title={item.label}
+      className={`block truncate rounded-control px-3 py-2 text-sm transition ${style}`}
     >
       {item.label}
     </Link>
   );
 }
 
-function NavList({ items }: { items: NavItem[] }) {
+function NavList({ items, nested = false }: { items: NavItem[]; nested?: boolean }) {
   return (
-    <ul className="space-y-1">
+    <ul className={nested ? "mt-1 ml-3 space-y-1 border-l border-line" : "space-y-1"}>
       {items.map((item) => (
         <li key={item.key}>
           <NavLink item={item} />
-          {item.children.length > 0 ? (
-            <ul className="mt-1 space-y-1 border-l border-line">
-              {item.children.map((child) => (
-                <li key={child.key}>
-                  <NavLink item={child} nested />
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {item.children.length > 0 ? <NavList items={item.children} nested /> : null}
         </li>
       ))}
     </ul>
   );
 }
 
-export function Sidebar({ badge }: { badge?: ReactNode }) {
+export function Sidebar({ badge, projects = [] }: { badge?: ReactNode; projects?: readonly NavProject[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   // Navigating closes the menu. Reset during render (not in an effect) so it never flashes open.
@@ -52,7 +48,7 @@ export function Sidebar({ badge }: { badge?: ReactNode }) {
     setLastPath(pathname);
     setOpen(false);
   }
-  const items = getNavItems(pathname);
+  const items = getNavItems(pathname, projects);
 
   return (
     <>
