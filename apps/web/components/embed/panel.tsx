@@ -13,7 +13,13 @@ import {
   MAX_MESSAGE_CHARS,
   type WidgetConfig,
 } from "@askwell/shared";
-import { chatErrorMessage, mockChat, type ChatClient } from "./chat-client";
+import {
+  ChatError,
+  chatErrorMessage,
+  realChat,
+  type ChatClient,
+} from "./chat-client";
+import { clearConversationId, loadConversationId, saveConversationId } from "./conversation-store";
 import { MessageList, type PanelMessage } from "./message-list";
 import { createParentChannel } from "./parent-channel";
 import { getVisitorId } from "./visitor-id";
@@ -23,7 +29,7 @@ type PanelProps = {
   /** Parent page origin from the query, already validated. Null: never post anywhere. */
   parentOrigin: string | null;
   config: Pick<WidgetConfig, "headerText" | "showBadge">;
-  /** Phase 3 passes the real client here. */
+  /** Defaults to the real route; tests pass the mock. */
   chat?: ChatClient;
 };
 
@@ -31,7 +37,7 @@ export function Panel({
   publicKey,
   parentOrigin,
   config,
-  chat = mockChat,
+  chat = realChat,
 }: PanelProps) {
   const [messages, setMessages] = useState<PanelMessage[]>([]);
   const [input, setInput] = useState("");
@@ -63,6 +69,8 @@ export function Panel({
     const text = input.trim();
     if (!text || pending || text.length > MAX_MESSAGE_CHARS) return;
     visitorId.current ??= getVisitorId();
+    // Resume the session's conversation (after a reload, the bot still remembers it).
+    conversationId.current ??= loadConversationId(publicKey);
     setError(null);
     setInput("");
     setPending(true);
@@ -78,11 +86,17 @@ export function Panel({
         message: text,
       });
       conversationId.current = res.conversationId;
+      saveConversationId(publicKey, res.conversationId);
       setMessages((m) => [
         ...m,
         { id: `m${nextId.current++}`, role: "bot", text: res.reply },
       ]);
     } catch (e) {
+      // A 404 means the stored conversation is gone or not ours: start a new one next time.
+      if (e instanceof ChatError && e.status === 404) {
+        conversationId.current = undefined;
+        clearConversationId(publicKey);
+      }
       setError(chatErrorMessage(e));
       setInput(text); // let them resend without retyping
     } finally {
