@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import {
   DEFAULT_WIDGET_CONFIG,
+  PLAN_LIMITS,
+  PUBLIC_KEY_REGEX,
   KNOWLEDGE_SOURCE_STATUSES,
   KNOWLEDGE_SOURCE_TYPES,
   MESSAGE_ROLES,
@@ -289,11 +291,11 @@ describe("anon", () => {
 });
 
 describe("RLS helpers", () => {
-  it("are SECURITY DEFINER, STABLE, with an empty search_path", async () => {
+  it("are the only SECURITY DEFINER functions, STABLE, with an empty search_path", async () => {
     const r = await asService<{ proname: string; prosecdef: boolean; provolatile: string; proconfig: string[] }>(
       db,
       `select proname, prosecdef, provolatile, proconfig from pg_proc
-       where pronamespace = 'public'::regnamespace order by proname`,
+       where pronamespace = 'public'::regnamespace and prosecdef order by proname`,
     );
     expect(r.rows.map((x) => x.proname)).toEqual(["owned_conversation_ids", "owned_project_ids"]);
     for (const f of r.rows) {
@@ -350,5 +352,134 @@ describe("cascade deletes", () => {
   it("deleting an account cascades to its projects", async () => {
     await asService(db, "delete from accounts where clerk_user_id = $1", [B]);
     expect(await count(asService<{ n: number }>(db, "select count(*)::int as n from projects"))).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// create_project (kept in this file: one PGlite instance per file keeps the suite within memory)
+// ---------------------------------------------------------------------------
+
+function first<T>(rows: T[]): T {
+  const row = rows[0];
+  if (row === undefined) throw new Error("expected at least one row");
+  return row;
+}
+
+const create = (owner: string, name: string, max: number) =>
+  asService<{ id: string; owner_id: string; name: string; public_key: string }>(
+    db,
+    "select * from public.create_project($1, $2, $3)",
+    [owner, name, max],
+  );
+const addAccount = (id: string, plan = "free") =>
+  asService(db, "insert into accounts (clerk_user_id, plan) values ($1, $2)", [id, plan]);
+
+describe("create_project", () => {
+  it("creates the project and a default widget config", async () => {
+    await addAccount("u_defaults");
+    const { rows } = await create("u_defaults", "My site", PLAN_LIMITS.free.projects);
+    expect(rows).toHaveLength(1);
+    expect(first(rows)).toMatchObject({ owner_id: "u_defaults", name: "My site" });
+
+    const cfg = await asService<Record<string, unknown>>(
+      db,
+      "select button_color, position, label, animation, header_text, show_badge from widget_configs where project_id = $1",
+      [first(rows).id],
+    );
+    expect(cfg.rows).toEqual([
+      {
+        button_color: DEFAULT_WIDGET_CONFIG.buttonColor,
+        position: DEFAULT_WIDGET_CONFIG.position,
+        label: DEFAULT_WIDGET_CONFIG.label,
+        animation: DEFAULT_WIDGET_CONFIG.animation,
+        header_text: DEFAULT_WIDGET_CONFIG.headerText,
+        show_badge: DEFAULT_WIDGET_CONFIG.showBadge,
+      },
+    ]);
+  });
+
+  it("generates a public key that matches PUBLIC_KEY_REGEX, 27 chars, unique per project", async () => {
+    await addAccount("u_keys");
+    const keys: string[] = [];
+    for (let i = 0; i < 8; i++) keys.push(first((await create("u_keys", `p${i}`, 100)).rows).public_key);
+    for (const key of keys) {
+      expect(key).toMatch(PUBLIC_KEY_REGEX);
+      expect(key).toHaveLength(27);
+    }
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("raises plan_limit_reached at the Free limit and creates nothing", async () => {
+    await addAccount("u_free");
+    const max = PLAN_LIMITS.free.projects;
+    for (let i = 0; i < max; i++) await create("u_free", `p${i}`, max);
+    await expect(create("u_free", "one too many", max)).rejects.toMatchObject({
+      message: "plan_limit_reached",
+      code: "P0001",
+    });
+    const count = await asService<{ n: number }>(
+      db,
+      "select count(*)::int n from projects where owner_id = 'u_free'",
+    );
+    expect(first(count.rows).n).toBe(max);
+  });
+
+  it("Pro limit allows exactly its max, then raises", async () => {
+    await addAccount("u_pro", "pro");
+    const max = PLAN_LIMITS.pro.projects;
+    expect(max).toBe(5);
+    for (let i = 0; i < max; i++) await create("u_pro", `p${i}`, max);
+    await expect(create("u_pro", "sixth", max)).rejects.toMatchObject({ message: "plan_limit_reached" });
+  });
+
+  it("counts only the caller's own projects", async () => {
+    await addAccount("u_iso_a");
+    await addAccount("u_iso_b");
+    await create("u_iso_a", "a1", 1);
+    await expect(create("u_iso_b", "b1", 1)).resolves.toBeDefined();
+  });
+
+  it("raises account_not_found when the owner has no account row", async () => {
+    await expect(create("u_nobody", "x", 5)).rejects.toMatchObject({
+      message: "account_not_found",
+      code: "P0002",
+    });
+  });
+
+  it("rejects a null or negative limit", async () => {
+    await addAccount("u_badmax");
+    await expect(create("u_badmax", "x", -1)).rejects.toMatchObject({ message: "invalid_argument" });
+    await expect(
+      asService(db, "select * from public.create_project('u_badmax', 'x', null)"),
+    ).rejects.toMatchObject({ message: "invalid_argument" });
+  });
+});
+
+describe("create_project privileges", () => {
+  it("is SECURITY INVOKER with an empty search_path", async () => {
+    const { rows } = await db.query<{ prosecdef: boolean; proconfig: string[] }>(
+      "select prosecdef, proconfig from pg_proc where proname = 'create_project'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(first(rows).prosecdef).toBe(false);
+    expect(first(rows).proconfig).toContain("search_path=\"\"");
+  });
+
+  it("authenticated cannot execute it", async () => {
+    await addAccount("u_authn");
+    await expect(
+      asUser(db, "u_authn", "select * from public.create_project('u_authn', 'x', 5)"),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it("anon cannot execute it", async () => {
+    await expect(asAnon(db, "select * from public.create_project('u_authn', 'x', 5)")).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  it("service_role can execute it", async () => {
+    await addAccount("u_svc");
+    await expect(create("u_svc", "ok", 1)).resolves.toBeDefined();
   });
 });
