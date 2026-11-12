@@ -2,24 +2,27 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { isDashboardRoute, isOwnerApiRoute } from "./lib/auth/routes";
 
-export default clerkMiddleware(async (auth, req) => {
-  const { pathname } = req.nextUrl;
+export default clerkMiddleware(
+  async (auth, req) => {
+    const { pathname } = req.nextUrl;
 
-  if (isOwnerApiRoute(pathname)) {
-    const { isAuthenticated } = await auth();
-    if (!isAuthenticated) {
-      return NextResponse.json(
-        { error: { code: "unauthorized", message: "Sign in to use this API." } },
-        { status: 401 },
-      );
+    if (isOwnerApiRoute(pathname)) {
+      const { isAuthenticated } = await auth();
+      if (!isAuthenticated) {
+        return NextResponse.json(
+          { error: { code: "unauthorized", message: "Sign in to use this API." } },
+          { status: 401 },
+        );
+      }
+      return;
     }
-    return;
-  }
 
-  if (isDashboardRoute(pathname)) {
-    await auth.protect();
-  }
-});
+    if (isDashboardRoute(pathname)) {
+      await auth.protect();
+    }
+  },
+  { signInUrl: "/sign-in", signUpUrl: "/sign-up" },
+);
 
 export const config = {
   matcher: [
