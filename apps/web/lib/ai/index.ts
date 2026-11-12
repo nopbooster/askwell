@@ -1,8 +1,11 @@
 import "server-only";
+import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 
-/** OpenAI's smallest, cheapest chat model per its model list (checked 2026-11-12). */
-export const CHAT_MODEL = "gpt-6-luna";
+/** Chat replies use Claude (Anthropic): the small, cheap Haiku. Embeddings stay on OpenAI. */
+export const CHAT_MODEL = "claude-haiku-5-5";
+/** Replies are short. This also caps the cost of one reply (thinking tokens count toward it). */
+export const CHAT_MAX_TOKENS = 1024;
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
 
@@ -13,13 +16,22 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type ChatResult = { text: string; usage: TokenUsage };
 
-let client: OpenAI | undefined;
-/** Lazy, so importing this module (or building) needs no key. */
-function getClient(): OpenAI {
+let openaiClient: OpenAI | undefined;
+/** Embeddings only. Lazy, so importing this module (or building) needs no key. */
+function getOpenAI(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-  client ??= new OpenAI({ apiKey });
-  return client;
+  openaiClient ??= new OpenAI({ apiKey });
+  return openaiClient;
+}
+
+let anthropicClient: Anthropic | undefined;
+/** Chat only. Lazy like the OpenAI client; the key is server-only (never `NEXT_PUBLIC_*`). */
+function getAnthropic(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+  anthropicClient ??= new Anthropic({ apiKey });
+  return anthropicClient;
 }
 
 /**
@@ -27,7 +39,7 @@ function getClient(): OpenAI {
  * Throws on an API failure; callers decide how to surface it.
  */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-  const openai = getClient();
+  const openai = getOpenAI();
   const vectors: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
     const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE);
@@ -41,7 +53,10 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   return vectors;
 }
 
-/** One chat completion: a system prompt plus the conversation. Returns the text and token usage. */
+/**
+ * One chat completion with Claude: a system prompt plus the conversation. Returns the text and token usage.
+ * The system prompt goes in the `system` field, not in `messages`. Low effort keeps short replies cheap and fast.
+ */
 export async function chatComplete({
   system,
   messages,
@@ -49,15 +64,17 @@ export async function chatComplete({
   system: string;
   messages: ChatMessage[];
 }): Promise<ChatResult> {
-  const res = await getClient().chat.completions.create({
+  const res = await getAnthropic().messages.create({
     model: CHAT_MODEL,
-    messages: [{ role: "system", content: system }, ...messages],
+    max_tokens: CHAT_MAX_TOKENS,
+    output_config: { effort: "low" },
+    system,
+    messages,
   });
+  // Only text blocks are the reply (a thinking block, if any, is never shown). A refusal has no text.
+  const text = res.content.map((block) => (block.type === "text" ? block.text : "")).join("");
   return {
-    text: res.choices[0]?.message?.content ?? "",
-    usage: {
-      inputTokens: res.usage?.prompt_tokens ?? 0,
-      outputTokens: res.usage?.completion_tokens ?? 0,
-    },
+    text,
+    usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens },
   };
 }
