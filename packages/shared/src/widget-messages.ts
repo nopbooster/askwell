@@ -40,11 +40,16 @@ export type WidgetMessage =
  * loader bundle can drop it: the loader does NOT use zod, because zod would blow its 5 KB budget; it uses `parseWidgetMessage`, which is hand-written
  * and checked against this schema in the tests.
  */
-export const getWidgetMessageSchema = () =>
-  z.discriminatedUnion("type", [
-    z.object({ type: z.literal("ready") }),
-    z.object({ type: z.literal("close") }),
+export const getWidgetMessageSchema = () => {
+  const envelope = {
+    source: z.literal(widgetMessageSource()),
+    version: z.literal(WIDGET_MESSAGE_VERSION),
+  };
+  return z.discriminatedUnion("type", [
+    z.object({ ...envelope, type: z.literal("ready") }),
+    z.object({ ...envelope, type: z.literal("close") }),
     z.object({
+      ...envelope,
       type: z.literal("resize"),
       height: z
         .number()
@@ -53,12 +58,20 @@ export const getWidgetMessageSchema = () =>
         .max(WIDGET_RESIZE_MAX_HEIGHT),
     }),
     z.object({
+      ...envelope,
       type: z.literal("unread"),
       count: z.number().int().min(0).max(WIDGET_UNREAD_MAX),
     }),
   ]);
+};
 
-/** Builds a valid message (panel side). */
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, Number.isFinite(n) ? Math.round(n) : min));
+
+/**
+ * Builds a valid message (panel side). Numbers are clamped into the protocol limits, and the
+ * envelope (`source`, `version`) always wins, so the loader never gets a message it would drop.
+ */
 export function createWidgetMessage(
   message:
     | { type: "ready" }
@@ -66,11 +79,30 @@ export function createWidgetMessage(
     | { type: "resize"; height: number }
     | { type: "unread"; count: number },
 ): WidgetMessage {
-  return {
+  const envelope = {
     source: widgetMessageSource(),
     version: WIDGET_MESSAGE_VERSION,
-    ...message,
   };
+  switch (message.type) {
+    case "resize":
+      return {
+        ...envelope,
+        type: "resize",
+        height: clamp(
+          message.height,
+          WIDGET_RESIZE_MIN_HEIGHT,
+          WIDGET_RESIZE_MAX_HEIGHT,
+        ),
+      };
+    case "unread":
+      return {
+        ...envelope,
+        type: "unread",
+        count: clamp(message.count, 0, WIDGET_UNREAD_MAX),
+      };
+    default:
+      return { ...envelope, type: message.type };
+  }
 }
 
 function isInt(value: unknown, min: number, max: number): value is number {

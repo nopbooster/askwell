@@ -139,6 +139,19 @@ describe("start-up", () => {
   });
 });
 
+describe("button text color", () => {
+  it.each([
+    ["#ff00ff", "#0a0a0a"],
+    ["#ffffff", "#0a0a0a"],
+    ["#0a0a0a", "#fff"],
+    ["#336699", "#fff"],
+  ])("%s gets the higher-contrast text color", async (color, text) => {
+    mockFetch(() => ok({ ...config, buttonColor: color }));
+    const h = await mustInit();
+    expect(button(h).style.color).toBe(text);
+  });
+});
+
 describe("mounting", () => {
   it("waits for <body> when the script runs from <head>", async () => {
     const body = document.body;

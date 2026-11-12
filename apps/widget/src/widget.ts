@@ -37,11 +37,17 @@ function parseConfig(data: unknown): WidgetConfig | null {
   return c as WidgetConfig;
 }
 
-/** Black or white text, whichever reads better on the button color. */
+/** Black or white text, whichever has the higher WCAG contrast on the button color. */
 function textOn(hex: string): string {
   const n = parseInt(hex.slice(1), 16);
-  const lum = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  return lum > 150 ? "#0a0a0a" : "#fff";
+  const lin = (c: number) =>
+    (c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  const lum =
+    0.2126 * lin(n >> 16) +
+    0.7152 * lin((n >> 8) & 255) +
+    0.0722 * lin(n & 255);
+  // contrast with white is 1.05/(lum+.05); with black it is (lum+.05)/.05
+  return lum > 0.179 ? "#0a0a0a" : "#fff";
 }
 
 const CSS = `

@@ -63,7 +63,7 @@ describe("parseWidgetMessage", () => {
     for (const j of junk) expect(parseWidgetMessage(j)).toBeNull();
   });
 
-  it("agrees with the zod schema", () => {
+  it("agrees with the zod schema on complete messages", () => {
     const candidates: Record<string, unknown>[] = [
       { type: "ready" },
       { type: "close" },
@@ -75,11 +75,53 @@ describe("parseWidgetMessage", () => {
       { type: "unread", count: 1000 },
       { type: "unread", count: -1 },
       { type: "bogus" },
+      { source: "other-widget", type: "close" },
+      { version: 2, type: "close" },
     ];
     for (const c of candidates) {
-      expect(parseWidgetMessage({ ...base, ...c }) !== null).toBe(
-        getWidgetMessageSchema().safeParse(c).success,
+      const full = { ...base, ...c };
+      expect(parseWidgetMessage(full) !== null, JSON.stringify(full)).toBe(
+        getWidgetMessageSchema().safeParse(full).success,
       );
     }
+    // an incomplete message (no envelope) is rejected by both
+    expect(getWidgetMessageSchema().safeParse({ type: "close" }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("createWidgetMessage", () => {
+  it("clamps numbers so the loader never drops the result", () => {
+    for (const [input, expected] of [
+      [{ type: "unread", count: 1000 }, 999],
+      [{ type: "unread", count: -4 }, 0],
+      [{ type: "unread", count: 2.6 }, 3],
+    ] as const) {
+      expect(parseWidgetMessage(createWidgetMessage(input))).toMatchObject({
+        count: expected,
+      });
+    }
+    for (const [h, expected] of [
+      [0, 1],
+      [99999, 5000],
+      [Number.NaN, 1],
+      [300.4, 300],
+    ] as const) {
+      expect(
+        parseWidgetMessage(createWidgetMessage({ type: "resize", height: h })),
+      ).toMatchObject({
+        height: expected,
+      });
+    }
+  });
+
+  it("cannot have its envelope overridden by extra fields", () => {
+    const extra = {
+      type: "close" as const,
+      source: "other-widget",
+      version: 9,
+    };
+    expect(parseWidgetMessage(createWidgetMessage(extra))).not.toBeNull();
   });
 });
