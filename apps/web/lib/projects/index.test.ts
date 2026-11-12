@@ -15,7 +15,7 @@ vi.mock("../supabase/owner", () => ({
   }),
 }));
 
-import { getOwnedProject, toProject } from "./index";
+import { getOwnedProject, listOwnedProjects, toProject } from "./index";
 
 const ROW = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -65,5 +65,18 @@ describe("getOwnedProject", () => {
   it("throws on a database error", async () => {
     result = { data: null, error: { message: "boom" } };
     await expect(getOwnedProject(ROW.id)).rejects.toThrow("boom");
+  });
+});
+
+describe("listOwnedProjects", () => {
+  it("returns the rows newest first, via the owner client", async () => {
+    result = { data: [ROW], error: null };
+    await expect(listOwnedProjects()).resolves.toEqual([ROW]);
+    expect(last.calls.order).toEqual([["created_at", { ascending: false }]]);
+  });
+
+  it("throws on a database error", async () => {
+    result = { data: null, error: { message: "boom" } };
+    await expect(listOwnedProjects()).rejects.toThrow("boom");
   });
 });
