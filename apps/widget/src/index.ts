@@ -1,2 +1,4 @@
-// Widget loader stub. It does nothing yet; later phases add the button and iframe.
-export {};
+import { init } from "./widget";
+
+// Runs on the customer's page. `currentScript` is this very <script> tag.
+void init(document.currentScript as HTMLScriptElement | null);
