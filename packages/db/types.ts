@@ -7,133 +7,53 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
   public: {
     Tables: {
       accounts: {
         Row: {
           clerk_user_id: string
-          plan: string
           created_at: string
+          plan: string
         }
         Insert: {
           clerk_user_id: string
-          plan?: string
           created_at?: string
+          plan?: string
         }
         Update: {
           clerk_user_id?: string
-          plan?: string
           created_at?: string
+          plan?: string
         }
         Relationships: []
       }
-      projects: {
+      conversations: {
         Row: {
-          id: string
-          owner_id: string
-          name: string
-          public_key: string
-          messages_used: number
-          period_start: string
           created_at: string
-        }
-        Insert: {
-          id?: string
-          owner_id: string
-          name: string
-          public_key: string
-          messages_used?: number
-          period_start?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          owner_id?: string
-          name?: string
-          public_key?: string
-          messages_used?: number
-          period_start?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "projects_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["clerk_user_id"]
-          },
-        ]
-      }
-      widget_configs: {
-        Row: {
-          project_id: string
-          button_color: string
-          position: string
-          label: string
-          animation: string
-          header_text: string
-          show_badge: boolean
-        }
-        Insert: {
-          project_id: string
-          button_color?: string
-          position?: string
-          label?: string
-          animation?: string
-          header_text?: string
-          show_badge?: boolean
-        }
-        Update: {
-          project_id?: string
-          button_color?: string
-          position?: string
-          label?: string
-          animation?: string
-          header_text?: string
-          show_badge?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "widget_configs_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      knowledge_sources: {
-        Row: {
           id: string
           project_id: string
-          title: string
-          type: string
-          storage_key: string | null
-          status: string
-          created_at: string
+          visitor_id: string
         }
         Insert: {
+          created_at?: string
           id?: string
           project_id: string
-          title: string
-          type: string
-          storage_key?: string | null
-          status: string
-          created_at?: string
+          visitor_id: string
         }
         Update: {
+          created_at?: string
           id?: string
           project_id?: string
-          title?: string
-          type?: string
-          storage_key?: string | null
-          status?: string
-          created_at?: string
+          visitor_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "knowledge_sources_project_id_fkey"
+            foreignKeyName: "conversations_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -143,25 +63,25 @@ export type Database = {
       }
       knowledge_chunks: {
         Row: {
+          content: string
+          embedding: string
           id: string
           project_id: string
           source_id: string
-          content: string
-          embedding: string
         }
         Insert: {
+          content: string
+          embedding: string
           id?: string
           project_id: string
           source_id: string
-          content: string
-          embedding: string
         }
         Update: {
+          content?: string
+          embedding?: string
           id?: string
           project_id?: string
           source_id?: string
-          content?: string
-          embedding?: string
         }
         Relationships: [
           {
@@ -180,28 +100,37 @@ export type Database = {
           },
         ]
       }
-      conversations: {
+      knowledge_sources: {
         Row: {
+          created_at: string
           id: string
           project_id: string
-          visitor_id: string
-          created_at: string
+          status: string
+          storage_key: string | null
+          title: string
+          type: string
         }
         Insert: {
+          created_at?: string
           id?: string
           project_id: string
-          visitor_id: string
-          created_at?: string
+          status: string
+          storage_key?: string | null
+          title: string
+          type: string
         }
         Update: {
+          created_at?: string
           id?: string
           project_id?: string
-          visitor_id?: string
-          created_at?: string
+          status?: string
+          storage_key?: string | null
+          title?: string
+          type?: string
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_project_id_fkey"
+            foreignKeyName: "knowledge_sources_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -211,25 +140,25 @@ export type Database = {
       }
       messages: {
         Row: {
-          id: string
-          conversation_id: string
-          role: string
           body: string
+          conversation_id: string
           created_at: string
+          id: string
+          role: string
         }
         Insert: {
-          id?: string
-          conversation_id: string
-          role: string
           body: string
+          conversation_id: string
           created_at?: string
+          id?: string
+          role: string
         }
         Update: {
-          id?: string
-          conversation_id?: string
-          role?: string
           body?: string
+          conversation_id?: string
           created_at?: string
+          id?: string
+          role?: string
         }
         Relationships: [
           {
@@ -241,19 +170,89 @@ export type Database = {
           },
         ]
       }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          messages_used: number
+          name: string
+          owner_id: string
+          period_start: string
+          public_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages_used?: number
+          name: string
+          owner_id: string
+          period_start?: string
+          public_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages_used?: number
+          name?: string
+          owner_id?: string
+          period_start?: string
+          public_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["clerk_user_id"]
+          },
+        ]
+      }
+      widget_configs: {
+        Row: {
+          animation: string
+          button_color: string
+          header_text: string
+          label: string
+          position: string
+          project_id: string
+          show_badge: boolean
+        }
+        Insert: {
+          animation?: string
+          button_color?: string
+          header_text?: string
+          label?: string
+          position?: string
+          project_id: string
+          show_badge?: boolean
+        }
+        Update: {
+          animation?: string
+          button_color?: string
+          header_text?: string
+          label?: string
+          position?: string
+          project_id?: string
+          show_badge?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "widget_configs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      owned_conversation_ids: {
-        Args: never
-        Returns: string[]
-      }
-      owned_project_ids: {
-        Args: never
-        Returns: string[]
-      }
+      owned_conversation_ids: { Args: never; Returns: string[] }
+      owned_project_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
@@ -264,8 +263,125 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database["public"]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
