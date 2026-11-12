@@ -251,6 +251,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_knowledge_source: {
+        Args: { p_project_id: string; p_source_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          project_id: string
+          status: string
+          storage_key: string | null
+          title: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "knowledge_sources"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      consume_message: {
+        Args: { p_limit: number; p_project_id: string }
+        Returns: {
+          allowed: boolean
+          messages_used: number
+        }[]
+      }
       create_project: {
         Args: { p_max_projects: number; p_name: string; p_owner_id: string }
         Returns: {
@@ -269,8 +294,51 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      match_chunks: {
+        Args: {
+          p_embedding: string
+          p_match_count: number
+          p_project_id: string
+        }
+        Returns: {
+          chunk_id: string
+          content: string
+          similarity: number
+          source_id: string
+        }[]
+      }
       owned_conversation_ids: { Args: never; Returns: string[] }
       owned_project_ids: { Args: never; Returns: string[] }
+      reserve_knowledge_source: {
+        Args: {
+          p_max_sources: number
+          p_project_id: string
+          p_status: string
+          p_storage_key: string
+          p_title: string
+          p_type: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          project_id: string
+          reclaimed_keys: string[]
+          status: string
+          storage_key: string
+          title: string
+          type: string
+        }[]
+      }
+      save_chat_turn: {
+        Args: {
+          p_bot_reply: string
+          p_conversation_id: string
+          p_project_id: string
+          p_visitor_id: string
+          p_visitor_message: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
