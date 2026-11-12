@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { APP_NAME } from "@askwell/shared";
+import { PlanBadge } from "../../components/dashboard/plan-badge";
 import { Sidebar } from "../../components/dashboard/sidebar";
+import { ensureAccount, getOwnerPlan } from "../../lib/accounts";
 
 export const metadata: Metadata = {
   title: { default: `Dashboard · ${APP_NAME}`, template: `%s · ${APP_NAME}` },
 };
 
-export default function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
+  await ensureAccount();
+  const plan = await getOwnerPlan();
+
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar />
+      <Sidebar badge={<PlanBadge state={plan} />} />
       <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
