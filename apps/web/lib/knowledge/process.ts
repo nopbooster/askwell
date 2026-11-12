@@ -1,5 +1,6 @@
 import "server-only";
 import { EMBEDDING_DIMENSIONS } from "@askwell/shared";
+import { embedTexts } from "../ai";
 import { createServiceClient } from "../supabase/service";
 import { chunkText, MAX_CHUNKS_PER_SOURCE } from "./chunk";
 
@@ -35,9 +36,10 @@ export async function processSource(args: {
   projectId: string;
   sourceId: string;
   text: string;
-  embed: EmbedFn;
+  /** Defaults to `embedTexts` from `lib/ai`; tests inject a fake. */
+  embed?: EmbedFn;
 }): Promise<ProcessResult> {
-  const { projectId, sourceId, text, embed } = args;
+  const { projectId, sourceId, text, embed = embedTexts } = args;
   const db = createServiceClient();
 
   const clearChunks = async () => {
