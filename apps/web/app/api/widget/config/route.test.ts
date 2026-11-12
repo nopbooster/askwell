@@ -18,13 +18,13 @@ beforeEach(() => {
 });
 
 describe("GET /api/widget/config", () => {
-  it("200: returns only the six config fields, with CORS and a short cache", async () => {
+  it("200: returns only the six config fields, with CORS and revalidation on every load", async () => {
     impl = async () => ({ ...DEFAULT_WIDGET_CONFIG, buttonColor: "#112233" });
     const res = await call(`?key=${KEY}`);
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(res.headers.get("Access-Control-Allow-Credentials")).toBeNull();
-    expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+    expect(res.headers.get("Cache-Control")).toBe("no-cache");
     const body = await res.json();
     expect(WidgetConfigResponseSchema.safeParse(body).success).toBe(true);
     expect(Object.keys(body).sort()).toEqual(

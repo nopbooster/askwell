@@ -31,5 +31,5 @@ export async function GET(request: Request) {
   }
   if (!config) return errorResponse(404, "not_found", "Unknown key.");
 
-  return NextResponse.json(config, { headers: { ...CORS_HEADERS, "Cache-Control": "public, max-age=60" } });
+  return NextResponse.json(config, { headers: { ...CORS_HEADERS, "Cache-Control": "no-cache" } });
 }
