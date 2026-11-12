@@ -70,7 +70,7 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 **Goal:** the bot answers real questions from the owner's documents.
 
-**Keys needed:** `OPENAI_API_KEY`, `ARCJET_KEY` (the `knowledge` Storage bucket is created by a migration)
+**Keys needed:** `OPENAI_API_KEY` (embeddings), `ANTHROPIC_API_KEY` (chat; deployed app only), `ARCJET_KEY` (the `knowledge` Storage bucket is created by a migration)
 
 | Lane              | Includes                                                                                                                              | project.md |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
