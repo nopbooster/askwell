@@ -4,12 +4,13 @@
  *
  * Stubbed: roles (anon / authenticated / service_role), Supabase's default grants on
  * schema `public`, schema `auth` (jwt(), uid(), role()), schema `extensions` with
- * pgvector. Not stubbed: Storage, Realtime, PostgREST itself.
+ * pgvector and pgcrypto. Not stubbed: Storage, Realtime, PostgREST itself.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite, type Results } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { vector } from "@electric-sql/pglite-pgvector";
 
 export type SupabaseRole = "anon" | "authenticated" | "service_role";
@@ -30,6 +31,7 @@ create role service_role nologin noinherit bypassrls;
 
 create schema extensions;
 create extension vector with schema extensions;
+create extension pgcrypto with schema extensions;
 alter database postgres set search_path = "$user", public, extensions;
 set search_path = "$user", public, extensions;
 
@@ -70,7 +72,7 @@ export type CreateOptions = {
 
 /** Create a fresh in-memory database and apply every migration in name order. */
 export async function createSupabasePglite(options: CreateOptions = {}): Promise<PGlite> {
-  const db = await PGlite.create({ extensions: { vector } });
+  const db = await PGlite.create({ extensions: { vector, pgcrypto } });
   await db.exec(SUPABASE_STUBS);
   await applyMigrations(db, options.migrationsDir ?? DEFAULT_MIGRATIONS_DIR);
   return db;
