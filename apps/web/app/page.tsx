@@ -1,3 +1,4 @@
+// Verification build only (PR #9 never merges).
 import { Demo } from "../components/landing/demo";
 import { LandingFooter } from "../components/landing/footer";
 import { LandingHeader } from "../components/landing/header";
