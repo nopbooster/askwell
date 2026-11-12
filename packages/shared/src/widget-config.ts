@@ -12,7 +12,7 @@ export type WidgetConfig = {
 
 /** The Free look. Column defaults of `widget_configs` must match these values. */
 export const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
-  buttonColor: "#4f46e5",
+  buttonColor: "#0a0a0a",
   position: "bottom-right",
   label: "Ask us",
   animation: "fade",
