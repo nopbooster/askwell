@@ -5,7 +5,19 @@ vi.mock("server-only", () => ({}));
 
 let impl: (key: string) => Promise<unknown> = async () => null;
 const getWidgetConfigByKey = vi.fn((key: string) => impl(key));
-vi.mock("../../../../lib/widget/config", () => ({ getWidgetConfigByKey: (key: string) => getWidgetConfigByKey(key) }));
+vi.mock("../../../../lib/widget/config", () => ({
+  getWidgetConfigByKey: (key: string) => getWidgetConfigByKey(key),
+}));
+
+let limitStatus: "allowed" | "rate_limited" = "allowed";
+const protectWidgetRequest =
+  vi.fn<
+    (req: Request, opts: { route: string; publicKey: string }) => Promise<{ status: string }>
+  >();
+vi.mock("../../../../lib/arcjet", () => ({
+  protectWidgetRequest: (req: Request, opts: { route: string; publicKey: string }) =>
+    protectWidgetRequest(req, opts),
+}));
 
 import { GET, OPTIONS } from "./route";
 
@@ -14,10 +26,32 @@ const call = (query: string) => GET(new Request(`http://localhost/api/widget/con
 
 beforeEach(() => {
   getWidgetConfigByKey.mockClear();
+  protectWidgetRequest.mockReset();
+  protectWidgetRequest.mockImplementation(async () => ({ status: limitStatus }));
+  limitStatus = "allowed";
   impl = async () => null;
 });
 
 describe("GET /api/widget/config", () => {
+  it("429: over the rate limit, shared error shape with CORS, and no database read", async () => {
+    limitStatus = "rate_limited";
+    const res = await call(`?key=${KEY}`);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(ApiErrorSchema.parse(await res.json()).error.code).toBe("rate_limited");
+    expect(getWidgetConfigByKey).not.toHaveBeenCalled();
+    expect(protectWidgetRequest).toHaveBeenCalledWith(expect.any(Request), {
+      route: "config",
+      publicKey: KEY,
+    });
+  });
+
+  it("does not rate limit a request with an invalid key", async () => {
+    await call("?key=bad");
+    expect(protectWidgetRequest).not.toHaveBeenCalled();
+  });
+
   it("200: returns only the six config fields, with CORS and revalidation on every load", async () => {
     impl = async () => ({ ...DEFAULT_WIDGET_CONFIG, buttonColor: "#112233" });
     const res = await call(`?key=${KEY}`);
