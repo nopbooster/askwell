@@ -3,7 +3,7 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { APP_NAME } from "@askwell/shared";
 import { Button } from "../ui/button";
 import { getNavItems, type NavItem } from "./nav";
@@ -43,7 +43,7 @@ function NavList({ items }: { items: NavItem[] }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ badge }: { badge?: ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   // Navigating closes the menu. Reset during render (not in an effect) so it never flashes open.
@@ -57,7 +57,10 @@ export function Sidebar() {
   return (
     <>
       <div className="glass sticky top-0 z-20 flex items-center justify-between px-4 py-3 md:hidden">
-        <span className="font-semibold">{APP_NAME}</span>
+        <span className="flex items-center gap-2 font-semibold">
+          {APP_NAME}
+          {badge}
+        </span>
         <div className="flex items-center gap-2">
           <UserButton />
           <Button
@@ -81,8 +84,9 @@ export function Sidebar() {
         <nav aria-label="Dashboard" className="flex-1">
           <NavList items={items} />
         </nav>
-        <div className="hidden px-3 md:block">
+        <div className="hidden items-center gap-2 px-3 md:flex">
           <UserButton />
+          {badge}
         </div>
       </aside>
     </>
