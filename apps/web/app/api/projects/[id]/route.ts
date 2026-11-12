@@ -8,7 +8,9 @@ import {
 } from "@askwell/shared";
 import { getOwnerPlan } from "../../../../lib/accounts";
 import { createOwnerClient } from "../../../../lib/supabase/owner";
-import { toProject } from "../../../../lib/projects";
+import { getOwnedProject, toProject } from "../../../../lib/projects";
+import { removeProjectFiles } from "../../../../lib/knowledge";
+import { createServiceClient } from "../../../../lib/supabase/service";
 import { apiError, internalError, readJson } from "../../../../lib/api/http";
 
 type Context = { params: Promise<{ id: string }> };
@@ -38,12 +40,18 @@ export async function PATCH(request: Request, { params }: Context) {
   }
 }
 
-/** DELETE /api/projects/:id. Owner client: RLS only lets the owner delete their own row. */
+/**
+ * DELETE /api/projects/:id. Owner client: RLS only lets the owner delete their own row.
+ * First removes the project's files from Storage (service client, only after the ownership check).
+ * If that fails the project stays, so the owner can retry and no file is orphaned.
+ */
 export async function DELETE(_request: Request, { params }: Context) {
   const parsedParams = DeleteProjectParamsSchema.safeParse(await params);
   if (!parsedParams.success) return apiError(400, "validation_failed", "Invalid project id.");
 
   try {
+    if (!(await getOwnedProject(parsedParams.data.id))) return apiError(404, "not_found", "Project not found.");
+    await removeProjectFiles(createServiceClient(), parsedParams.data.id);
     const { data, error } = await (await createOwnerClient())
       .from("projects")
       .delete()
