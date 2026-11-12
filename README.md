@@ -22,6 +22,17 @@ pnpm dev                     # http://localhost:3000
 | `packages/db` | `@askwell/db`: database types and the pglite test helper (`@askwell/db/supabase-pglite`, tests only) |
 | `supabase` | `config.toml` and `migrations/` (SQL files, `<UTC timestamp>_<name>.sql`). No local Supabase stack. |
 
+## Widget demo
+
+A plain HTML page that plays the part of a customer site, on another origin. Use it to test the widget end to end.
+
+1. In the dashboard, create a project and open **Install**. Copy the script tag.
+2. Paste it into `apps/widget/demo/index.html`, at the marked spot.
+3. Serve the folder on another origin: `npx serve apps/widget/demo -l 5500`, then open http://localhost:5500.
+4. Check: the chat button shows in the bottom-right corner; click it, send a message, see the typing state and a mock reply; the panel's close button hides it. A wrong `data-key` renders nothing and leaves the page untouched.
+
+Don't commit your snippet (the key is public, but the page should stay a clean template).
+
 ## Commands
 
 | Command | Does |
