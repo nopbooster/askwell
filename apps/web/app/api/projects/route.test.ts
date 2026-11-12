@@ -63,6 +63,15 @@ describe("GET /api/projects", () => {
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 
+  it("ensures the account row first, so a new owner gets an empty list instead of an error", async () => {
+    ownerResult = { data: [], error: null };
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(ListProjectsResponseSchema.parse(await res.json())).toEqual({ projects: [], plan: "free" });
+    expect(ensureAccount).toHaveBeenCalledTimes(1);
+    expect(ensureAccount.mock.invocationCallOrder[0]).toBeLessThan(getOwnerPlan.mock.invocationCallOrder[0] ?? 0);
+  });
+
   it("uses the Pro message limit for a Pro owner", async () => {
     getOwnerPlan.mockResolvedValue({ status: "ok", plan: "pro" });
     const body = ListProjectsResponseSchema.parse(await (await GET()).json());

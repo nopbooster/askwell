@@ -12,9 +12,14 @@ import { createServiceClient } from "../../../lib/supabase/service";
 import { toProject } from "../../../lib/projects";
 import { apiError, internalError, readJson } from "../../../lib/projects/http";
 
-/** GET /api/projects: the owner's projects, newest first. Owner client, so RLS scopes the rows. */
+/**
+ * GET /api/projects: the owner's projects, newest first. Owner client, so RLS scopes the rows.
+ * Ensures the accounts row first (idempotent), so a brand-new owner gets `free` and an empty list
+ * instead of an error when they call the API before opening the dashboard.
+ */
 export async function GET() {
   try {
+    await ensureAccount();
     const planState = await getOwnerPlan();
     if (planState.status !== "ok") return internalError("GET /api/projects", "plan unavailable");
     const { data, error } = await (await createOwnerClient())
