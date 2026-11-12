@@ -131,7 +131,7 @@ $$;
 -- 4. match_chunks
 --    Top-k chunks by cosine similarity, only from `ready` sources of this project.
 --    Similarity = 1 - cosine distance. The HNSW index is searched before the project filter is
---    applied, so iterative scan keeps going until enough rows of this project are found
+--    applied, so iterative scan (set_config below) keeps going until enough rows of this project are found
 --    (without it a small project could get fewer than k results, or none).
 -- ---------------------------------------------------------------------------
 
@@ -142,12 +142,14 @@ create function public.match_chunks(
 )
 returns table (chunk_id uuid, source_id uuid, content text, similarity double precision)
 language plpgsql
-stable
 security invoker
 set search_path = ''
-set hnsw.iterative_scan = 'strict_order'
 as $$
 begin
+  -- Set at runtime, not in the function's SET clause: Supabase's migration role is refused
+  -- (42501) when a function SET names this extension GUC. Transaction-local, so it doesn't leak.
+  perform set_config('hnsw.iterative_scan', 'strict_order', true);
+
   if p_match_count is null or p_match_count < 1 or p_match_count > 100 then
     raise exception 'invalid_argument' using errcode = '22023';
   end if;
