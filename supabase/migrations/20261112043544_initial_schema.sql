@@ -19,7 +19,7 @@ create table public.projects (
   owner_id text not null references public.accounts (clerk_user_id) on delete cascade,
   name text not null,
   public_key text not null unique,
-  messages_used integer not null default 0,
+  messages_used integer not null default 0 check (messages_used >= 0),
   period_start timestamptz not null default (date_trunc('month', now() at time zone 'utc') at time zone 'utc'),
   created_at timestamptz not null default now()
 );
@@ -44,16 +44,21 @@ create table public.knowledge_sources (
   type text not null check (type in ('text', 'pdf', 'md', 'txt')),
   storage_key text,
   status text not null check (status in ('uploading', 'processing', 'ready', 'failed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Target of knowledge_chunks' composite FK: a chunk can't claim another project's source.
+  unique (id, project_id)
 );
 create index knowledge_sources_project_id_idx on public.knowledge_sources (project_id);
 
 create table public.knowledge_chunks (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects (id) on delete cascade,
-  source_id uuid not null references public.knowledge_sources (id) on delete cascade,
+  source_id uuid not null,
   content text not null,
-  embedding extensions.vector(1536) not null
+  embedding extensions.vector(1536) not null,
+  -- Composite FK keeps chunks.project_id equal to its source's project (match_chunks scopes by it).
+  foreign key (source_id, project_id)
+    references public.knowledge_sources (id, project_id) on delete cascade
 );
 create index knowledge_chunks_project_id_idx on public.knowledge_chunks (project_id);
 create index knowledge_chunks_source_id_idx on public.knowledge_chunks (source_id);

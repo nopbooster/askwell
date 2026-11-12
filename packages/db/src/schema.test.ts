@@ -190,6 +190,25 @@ describe("column defaults and checks", () => {
     );
   });
 
+  it("a chunk cannot point at another project's source", async () => {
+    await expect(
+      asService(
+        db,
+        "insert into knowledge_chunks (project_id, source_id, content, embedding) values ($1, $2, 'x', $3)",
+        [ID.pa, ID.sb, vec(3)],
+      ),
+    ).rejects.toThrow(/foreign key/);
+    await expect(
+      asService(db, "update knowledge_chunks set project_id = $1 where project_id = $2", [ID.pa, ID.pb]),
+    ).rejects.toThrow(/foreign key/);
+  });
+
+  it("messages_used cannot go negative", async () => {
+    await expect(asService(db, "update projects set messages_used = -1 where id = $1", [ID.pa])).rejects.toThrow(
+      /check constraint/,
+    );
+  });
+
   it("public_key is unique", async () => {
     await expect(
       asService(
