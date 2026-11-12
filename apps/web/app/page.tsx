@@ -1,9 +1,23 @@
-import { APP_NAME } from "@askwell/shared";
+import { Demo } from "../components/landing/demo";
+import { LandingFooter } from "../components/landing/footer";
+import { LandingHeader } from "../components/landing/header";
+import { Hero } from "../components/landing/hero";
+import { HowItWorks } from "../components/landing/how-it-works";
+import { InstallSnippet } from "../components/landing/install";
+import { PricingSection } from "../components/landing/pricing-section";
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-4xl font-semibold">{APP_NAME}</h1>
-    </main>
+    <div className="dark min-h-screen overflow-x-clip bg-canvas text-fg">
+      <LandingHeader />
+      <main>
+        <Hero />
+        <HowItWorks />
+        <Demo />
+        <PricingSection />
+        <InstallSnippet />
+      </main>
+      <LandingFooter />
+    </div>
   );
 }
