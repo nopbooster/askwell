@@ -1,3 +1,4 @@
+import { AuthProvider } from "../components/auth/auth-provider";
 import { Demo } from "../components/landing/demo";
 import { LandingFooter } from "../components/landing/footer";
 import { LandingHeader } from "../components/landing/header";
@@ -8,16 +9,18 @@ import { PricingSection } from "../components/landing/pricing-section";
 
 export default function HomePage() {
   return (
-    <div className="dark min-h-screen overflow-x-clip bg-canvas text-fg">
-      <LandingHeader />
-      <main>
-        <Hero />
-        <HowItWorks />
-        <Demo />
-        <PricingSection />
-        <InstallSnippet />
-      </main>
-      <LandingFooter />
-    </div>
+    <AuthProvider>
+      <div className="dark min-h-screen overflow-x-clip bg-canvas text-fg">
+        <LandingHeader />
+        <main>
+          <Hero />
+          <HowItWorks />
+          <Demo />
+          <PricingSection />
+          <InstallSnippet />
+        </main>
+        <LandingFooter />
+      </div>
+    </AuthProvider>
   );
 }
