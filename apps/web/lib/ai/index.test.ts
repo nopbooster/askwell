@@ -135,6 +135,24 @@ describe("chatComplete", () => {
     await expect(fresh.chatComplete({ system: "s", messages: [] })).rejects.toThrow("ANTHROPIC_API_KEY");
     expect(messagesCreate).not.toHaveBeenCalled();
   });
+  it("returns a reply cut off at max_tokens and logs a warning without the content", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    messagesCreate.mockResolvedValue({
+      ...reply([{ type: "text", text: "Partial" }], { input_tokens: 5, output_tokens: CHAT_MAX_TOKENS }),
+      stop_reason: "max_tokens",
+    });
+    expect((await chatComplete({ system: "s", messages: [] })).text).toBe("Partial");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("Partial");
+    warn.mockRestore();
+  });
+  it("does not warn on a normal end_turn reply", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    messagesCreate.mockResolvedValue({ ...reply([{ type: "text", text: "ok" }]), stop_reason: "end_turn" });
+    await chatComplete({ system: "s", messages: [] });
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
   it("lets API errors through for the caller to handle", async () => {
     messagesCreate.mockRejectedValue(new Error("overloaded"));
     await expect(chatComplete({ system: "s", messages: [] })).rejects.toThrow("overloaded");
