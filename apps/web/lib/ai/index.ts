@@ -73,6 +73,9 @@ export async function chatComplete({
   });
   // Only text blocks are the reply (a thinking block, if any, is never shown). A refusal has no text.
   const text = res.content.map((block) => (block.type === "text" ? block.text : "")).join("");
+  // A reply cut off at the token cap is still returned (a partial answer beats none), but we log it (never its text).
+  if (res.stop_reason === "max_tokens")
+    console.warn("[ai] chat reply hit max_tokens", { model: CHAT_MODEL, outputTokens: res.usage.output_tokens });
   return {
     text,
     usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens },
