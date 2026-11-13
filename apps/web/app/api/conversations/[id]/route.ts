@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { GetConversationParamsSchema, type GetConversationResponse } from "@askwell/shared";
+import { GetConversationParamsSchema, type GetConversationParams, type GetConversationResponse } from "@askwell/shared";
 import { apiError, internalError } from "../../../../lib/api/http";
 import { getConversationThread } from "../../../../lib/conversations";
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<GetConversationParams> };
 
 /**
  * GET /api/conversations/:id: one conversation and its messages, oldest first. Owner client only, so

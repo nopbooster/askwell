@@ -9,7 +9,7 @@ type Result = { data: unknown; error: { message: string } | null };
 function fakeQuery(result: Result) {
   const calls: Array<[string, unknown[]]> = [];
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order", "limit"]) {
+  for (const method of ["select", "eq", "order", "limit", "range"]) {
     builder[method] = (...args: unknown[]) => {
       calls.push([method, args]);
       return builder;
@@ -36,6 +36,7 @@ vi.mock("../supabase/service", () => ({ createServiceClient: () => serviceClient
 
 import {
   CONVERSATION_LIST_LIMIT,
+  MESSAGE_PAGE_SIZE,
   PREVIEW_MAX_CHARS,
   getConversationThread,
   listProjectConversations,
@@ -164,7 +165,57 @@ describe("getConversationThread", () => {
       ["eq", ["conversation_id", CONV]],
       ["order", ["created_at", { ascending: true }]],
       ["order", ["id", { ascending: true }]],
+      ["range", [0, MESSAGE_PAGE_SIZE - 1]],
     ]);
+  });
+  it("pages through more than MESSAGE_PAGE_SIZE messages so the thread is complete", async () => {
+    const total = 2 * MESSAGE_PAGE_SIZE + 5;
+    const all = Array.from({ length: total }, (_, i) => ({
+      id: `m-${String(i).padStart(5, "0")}`,
+      role: i === 0 ? "visitor" : "bot",
+      body: `msg ${i}`,
+      created_at: new Date(Date.UTC(2026, 10, 12) + i * 1000).toISOString(),
+    }));
+    results = [
+      { data: { id: CONV, visitor_id: "v1", created_at: "2026-11-12T10:00:00+00:00" }, error: null },
+      { data: all.slice(0, MESSAGE_PAGE_SIZE), error: null },
+      { data: all.slice(MESSAGE_PAGE_SIZE, 2 * MESSAGE_PAGE_SIZE), error: null },
+      { data: all.slice(2 * MESSAGE_PAGE_SIZE), error: null },
+    ];
+    const out = await getConversationThread(CONV);
+    expect(out?.messages).toHaveLength(total);
+    expect(out?.conversation.messageCount).toBe(total);
+    expect(out?.messages[0]?.body).toBe("msg 0");
+    expect(out?.messages.at(-1)?.body).toBe(`msg ${total - 1}`);
+    const ranges = queries.slice(1).map((q) => q.calls.find(([m]) => m === "range")?.[1]);
+    expect(ranges).toEqual([
+      [0, MESSAGE_PAGE_SIZE - 1],
+      [MESSAGE_PAGE_SIZE, 2 * MESSAGE_PAGE_SIZE - 1],
+      [2 * MESSAGE_PAGE_SIZE, 3 * MESSAGE_PAGE_SIZE - 1],
+    ]);
+    // Every page keeps the same stable order.
+    for (const q of queries.slice(1)) {
+      expect(q.calls.filter(([m]) => m === "order")).toEqual([
+        ["order", ["created_at", { ascending: true }]],
+        ["order", ["id", { ascending: true }]],
+      ]);
+    }
+  });
+  it("reads one more (empty) page when the count is an exact multiple of the page size", async () => {
+    const full = Array.from({ length: MESSAGE_PAGE_SIZE }, (_, i) => ({
+      id: `m-${i}`,
+      role: "visitor",
+      body: `msg ${i}`,
+      created_at: "2026-11-12T10:00:00+00:00",
+    }));
+    results = [
+      { data: { id: CONV, visitor_id: "v1", created_at: "2026-11-12T10:00:00+00:00" }, error: null },
+      { data: full, error: null },
+      { data: [], error: null },
+    ];
+    const out = await getConversationThread(CONV);
+    expect(out?.conversation.messageCount).toBe(MESSAGE_PAGE_SIZE);
+    expect(queries).toHaveLength(3);
   });
   it("returns null (and reads no messages) when RLS hides the conversation", async () => {
     results = [{ data: null, error: null }];

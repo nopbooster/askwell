@@ -1,5 +1,5 @@
 import "server-only";
-import type { ChatMessage, ConversationSummary, MessageRole } from "@askwell/shared";
+import type { ChatMessage, ConversationSummary, GetConversationResponse, MessageRole } from "@askwell/shared";
 import { createOwnerClient } from "../supabase/owner";
 
 /** The list shows the newest conversations only: no pagination (project.md §6.7). */
@@ -65,12 +65,18 @@ export function toChatMessage(row: MessageRow): ChatMessage {
 }
 
 /**
+ * Messages read per request. Must not exceed the API's `max_rows` (1000, `supabase/config.toml`):
+ * a page shorter than this ends the read, so a smaller server cap would cut the thread short.
+ */
+export const MESSAGE_PAGE_SIZE = 1000;
+
+/**
  * One conversation and all its messages, oldest first, or `null` when it doesn't exist or isn't the
  * caller's (RLS makes both look the same). Owner client only. Throws on a database error.
  */
 export async function getConversationThread(
   conversationId: string,
-): Promise<{ conversation: ConversationSummary; messages: ChatMessage[] } | null> {
+): Promise<GetConversationResponse | null> {
   const db = await createOwnerClient();
   const { data: conversation, error } = await db
     .from("conversations")
@@ -80,13 +86,21 @@ export async function getConversationThread(
   if (error) throw new Error(`getConversationThread: conversation read failed (${error.message})`);
   if (!conversation) return null;
 
-  const { data: rows, error: messagesError } = await db
-    .from("messages")
-    .select("id, role, body, created_at")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true });
-  if (messagesError) throw new Error(`getConversationThread: messages read failed (${messagesError.message})`);
+  // One response holds at most max_rows, so page through with the same stable order (created_at, id)
+  // until a short page. New messages only append at the end, so earlier pages don't shift.
+  const rows: MessageRow[] = [];
+  for (let from = 0; ; from += MESSAGE_PAGE_SIZE) {
+    const { data: page, error: messagesError } = await db
+      .from("messages")
+      .select("id, role, body, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + MESSAGE_PAGE_SIZE - 1);
+    if (messagesError) throw new Error(`getConversationThread: messages read failed (${messagesError.message})`);
+    rows.push(...page);
+    if (page.length < MESSAGE_PAGE_SIZE) break;
+  }
 
   const messages = rows.map(toChatMessage);
   return {

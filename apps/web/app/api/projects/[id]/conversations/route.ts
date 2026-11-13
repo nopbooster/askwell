@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { ListConversationsParamsSchema, type ListConversationsResponse } from "@askwell/shared";
+import { ListConversationsParamsSchema, type ListConversationsParams, type ListConversationsResponse } from "@askwell/shared";
 import { apiError, internalError } from "../../../../../lib/api/http";
 import { listProjectConversations } from "../../../../../lib/conversations";
 import { getOwnedProject } from "../../../../../lib/projects";
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: Promise<ListConversationsParams> };
 
 /**
  * GET /api/projects/:id/conversations: the newest 50 conversations, newest first, each with a preview
