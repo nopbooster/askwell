@@ -16,6 +16,8 @@ import {
   toKnowledgeSource,
 } from "../../../../../../lib/knowledge";
 import { getOwnedProject } from "../../../../../../lib/projects";
+import { knowledgeAdded } from "../../../../../../lib/analytics";
+import { trackServer } from "../../../../../../lib/analytics/server";
 import { createOwnerClient } from "../../../../../../lib/supabase/owner";
 import { createServiceClient } from "../../../../../../lib/supabase/service";
 
@@ -35,7 +37,8 @@ export async function POST(request: Request, { params }: Context) {
   const { sourceId } = parsedBody.data;
 
   try {
-    if (!(await getOwnedProject(projectId))) return apiError(404, "not_found", "Project not found.");
+    const project = await getOwnedProject(projectId);
+    if (!project) return apiError(404, "not_found", "Project not found.");
 
     // Service client only after the ownership check. The claim is one statement, so it succeeds once.
     const db = createServiceClient();
@@ -86,6 +89,8 @@ export async function POST(request: Request, { params }: Context) {
     if (type === "pdf" && !isPdf(bytes)) return reject("unsupported_file_type", "This file is not a real PDF.");
 
     after(() => processFileSource({ projectId, sourceId, type, bytes }));
+    // Counted here, once the file passed the real checks; `upload-url` only reserves a slot.
+    trackServer("knowledge_added", project.owner_id, knowledgeAdded({ projectId, sourceId, type }));
     const body: FinalizeKnowledgeResponse = { source: toKnowledgeSource(source) };
     return NextResponse.json(body);
   } catch (error) {

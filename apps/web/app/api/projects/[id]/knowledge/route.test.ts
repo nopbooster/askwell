@@ -37,6 +37,9 @@ vi.mock("../../../../../lib/knowledge/background", () => ({
   processFileSource: vi.fn(),
 }));
 
+const trackServer = vi.fn();
+vi.mock("../../../../../lib/analytics/server", () => ({ trackServer: (...args: unknown[]) => trackServer(...args) }));
+
 import { GET, POST } from "./route";
 
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -61,7 +64,8 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   afterTasks.length = 0;
   getOwnerPlan.mockReset().mockResolvedValue({ status: "ok", plan: "free" });
-  getOwnedProject.mockReset().mockResolvedValue({ id: ID });
+  getOwnedProject.mockReset().mockResolvedValue({ id: ID, owner_id: "user_1" });
+  trackServer.mockReset();
   rpc.mockReset().mockResolvedValue({ data: [ROW], error: null });
   remove.mockReset().mockResolvedValue({ data: [], error: null });
   processTextSource.mockReset().mockResolvedValue(undefined);
@@ -93,6 +97,18 @@ describe("POST /api/projects/:id/knowledge", () => {
     getOwnerPlan.mockResolvedValue({ status: "ok", plan: "pro" });
     await post(ID, { title: "FAQ", text: "x", plan: "pro" });
     expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_max_sources: PLAN_LIMITS.pro.knowledgeSources });
+  });
+
+  it("fires knowledge_added for the owner with ids and type only (no title or text)", async () => {
+    const res = await post(ID, { title: "Secret title", text: "secret visitor-facing text" });
+    expect(res.status).toBe(201);
+    expect(trackServer).toHaveBeenCalledTimes(1);
+    expect(trackServer).toHaveBeenCalledWith("knowledge_added", "user_1", {
+      project_id: ID,
+      source_id: ROW.id,
+      source_type: "text",
+    });
+    expect(JSON.stringify(trackServer.mock.calls)).not.toMatch(/secret/i);
   });
 
   it("403 plan_limit_reached at the limit, and nothing is processed", async () => {

@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { snippetCopied } from "../../lib/analytics";
+import { trackClient } from "../../lib/analytics/client";
 import { Button, GlassPanel } from "../ui";
 
 export function CopySnippet({ snippet }: { snippet: string }) {
@@ -8,6 +12,9 @@ export function CopySnippet({ snippet }: { snippet: string }) {
   const [failed, setFailed] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { userId } = useAuth();
+  const params = useParams<{ id?: string }>();
+  const projectId = typeof params?.id === "string" ? params.id : null;
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -28,6 +35,7 @@ export function CopySnippet({ snippet }: { snippet: string }) {
       setCopied(true);
       clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 2000);
+      if (projectId) void trackClient("snippet_copied", userId, snippetCopied({ projectId }));
     } catch {
       // Clipboard blocked: select the text so Ctrl/Cmd+C works.
       selectAll();

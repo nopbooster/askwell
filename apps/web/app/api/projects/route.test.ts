@@ -26,6 +26,10 @@ vi.mock("../../../lib/supabase/service", () => ({
   createServiceClient: () => ({ rpc: (...a: unknown[]) => rpc(...a), from: serviceFrom }),
 }));
 
+
+const trackServer = vi.fn();
+vi.mock("../../../lib/analytics/server", () => ({ trackServer: (...args: unknown[]) => trackServer(...args) }));
+
 import { GET, POST } from "./route";
 
 const ROW = {
@@ -49,6 +53,7 @@ beforeEach(() => {
   serviceFrom.mockReset();
   ownerResult = { data: [ROW], error: null };
   ownerFrom.mockClear();
+  trackServer.mockReset();
 });
 
 describe("GET /api/projects", () => {
@@ -126,6 +131,21 @@ describe("POST /api/projects", () => {
     }
     expect(rpc).not.toHaveBeenCalled();
     expect(ensureAccount).not.toHaveBeenCalled();
+  });
+
+  it("fires project_created for the Clerk user with the project id and plan only (no name)", async () => {
+    getOwnerPlan.mockResolvedValue({ status: "ok", plan: "pro" });
+    expect((await post({ name: "Secret Site" })).status).toBe(201);
+    expect(trackServer).toHaveBeenCalledTimes(1);
+    expect(trackServer).toHaveBeenCalledWith("project_created", "user_1", { project_id: ROW.id, plan: "pro" });
+    expect(JSON.stringify(trackServer.mock.calls)).not.toContain("Secret Site");
+  });
+
+  it("doesn't fire project_created when nothing was created", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "plan_limit_reached", code: "P0001" } });
+    await post({ name: "Site" });
+    await post({ name: "" });
+    expect(trackServer).not.toHaveBeenCalled();
   });
 
   it("403 plan_limit_reached at the Free limit, with an upgrade hint", async () => {
