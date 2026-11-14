@@ -11,6 +11,8 @@ import { createOwnerClient } from "../../../lib/supabase/owner";
 import { createServiceClient } from "../../../lib/supabase/service";
 import { toProject } from "../../../lib/projects";
 import { apiError, internalError, readJson } from "../../../lib/api/http";
+import { projectCreated } from "../../../lib/analytics";
+import { trackServer } from "../../../lib/analytics/server";
 
 /**
  * GET /api/projects: the owner's projects, newest first. Owner client, so RLS scopes the rows.
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
       return internalError("POST /api/projects", error);
     }
     const body: CreateProjectResponse = { project: toProject(data, plan) };
+    trackServer("project_created", userId, projectCreated({ projectId: body.project.id, plan }));
     return NextResponse.json(body, { status: 201 });
   } catch (error) {
     return internalError("POST /api/projects", error);

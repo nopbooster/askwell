@@ -5,16 +5,29 @@ vi.mock("server-only", () => ({}));
 const auth = vi.fn();
 vi.mock("@clerk/nextjs/server", () => ({ auth: () => auth() }));
 
-// A tiny in-memory `accounts` table that behaves like insert ... on conflict do nothing.
+// A tiny in-memory `accounts` table that behaves like insert ... on conflict do nothing ... returning:
+// the returned rows are only the ones this call inserted.
 const rows = new Map<string, Record<string, unknown>>();
-type UpsertResult = { error: { message: string } | null };
+type UpsertResult = { data: Array<{ clerk_user_id: string }> | null; error: { message: string } | null };
 const upsert = vi.fn<
   (row: { clerk_user_id: string }, opts: { onConflict: string; ignoreDuplicates: boolean }) => Promise<UpsertResult>
 >(async (row) => {
-  if (!rows.has(row.clerk_user_id)) rows.set(row.clerk_user_id, { plan: "free", ...row });
-  return { error: null };
+  if (rows.has(row.clerk_user_id)) return { data: [], error: null };
+  rows.set(row.clerk_user_id, { plan: "free", ...row });
+  return { data: [{ clerk_user_id: row.clerk_user_id }], error: null };
 });
-const serviceFrom = vi.fn<(table: string) => { upsert: typeof upsert }>(() => ({ upsert }));
+const select = vi.fn<(cols: string) => void>();
+const serviceFrom = vi.fn<(table: string) => unknown>(() => ({
+  upsert: (row: { clerk_user_id: string }, opts: { onConflict: string; ignoreDuplicates: boolean }) => ({
+    select: (cols: string) => {
+      select(cols);
+      return upsert(row, opts);
+    },
+  }),
+}));
+
+const trackServer = vi.fn();
+vi.mock("./analytics/server", () => ({ trackServer: (...args: unknown[]) => trackServer(...args) }));
 vi.mock("./supabase/service", () => ({ createServiceClient: () => ({ from: serviceFrom }) }));
 
 const ownerResult = vi.fn();
@@ -30,7 +43,9 @@ beforeEach(() => {
   rows.clear();
   auth.mockReset();
   upsert.mockClear();
+  select.mockClear();
   serviceFrom.mockClear();
+  trackServer.mockReset();
   ownerResult.mockReset();
   createOwnerClient.mockClear();
   auth.mockResolvedValue({ userId: "user_1" });
@@ -74,8 +89,18 @@ describe("ensureAccount", () => {
   });
 
   it("throws when the insert fails", async () => {
-    upsert.mockResolvedValueOnce({ error: { message: "boom" } });
+    upsert.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
     await expect(ensureAccount()).rejects.toThrow(/boom/);
+    expect(trackServer).not.toHaveBeenCalled();
+  });
+
+  it("fires signed_up once, for the Clerk user, only when the row is created", async () => {
+    await ensureAccount();
+    expect(select).toHaveBeenCalledWith("clerk_user_id");
+    expect(trackServer).toHaveBeenCalledTimes(1);
+    expect(trackServer).toHaveBeenCalledWith("signed_up", "user_1", {});
+    await ensureAccount(); // row already exists: conflict returns no row
+    expect(trackServer).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -98,7 +123,7 @@ describe("getOwnerPlan", () => {
         new Promise<UpsertResult>((resolve) => {
           finishInsert = () => {
             rows.set(row.clerk_user_id, { plan: "free", ...row });
-            resolve({ error: null });
+            resolve({ data: [{ clerk_user_id: row.clerk_user_id }], error: null });
           };
         }),
     );
@@ -116,7 +141,7 @@ describe("getOwnerPlan", () => {
   });
 
   it("returns an error state when the account can't be created, without guessing Free", async () => {
-    upsert.mockResolvedValueOnce({ error: { message: "boom" } });
+    upsert.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
     await expect(getOwnerPlan()).resolves.toEqual({ status: "error" });
     expect(ownerResult).not.toHaveBeenCalled();
   });

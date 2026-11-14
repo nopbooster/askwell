@@ -10,6 +10,8 @@ import { getOwnerPlan } from "../../../../../lib/accounts";
 import { apiError, internalError, readJson } from "../../../../../lib/api/http";
 import { limitMessage, processTextSource, reserveKnowledgeSource, toKnowledgeSource } from "../../../../../lib/knowledge";
 import { getOwnedProject } from "../../../../../lib/projects";
+import { knowledgeAdded } from "../../../../../lib/analytics";
+import { trackServer } from "../../../../../lib/analytics/server";
 import { createOwnerClient } from "../../../../../lib/supabase/owner";
 import { createServiceClient } from "../../../../../lib/supabase/service";
 
@@ -51,7 +53,8 @@ export async function POST(request: Request, { params }: Context) {
   const { title, text } = parsedBody.data;
 
   try {
-    if (!(await getOwnedProject(id))) return apiError(404, "not_found", "Project not found.");
+    const project = await getOwnedProject(id);
+    if (!project) return apiError(404, "not_found", "Project not found.");
     const planState = await getOwnerPlan();
     if (planState.status !== "ok") return internalError("POST /api/projects/:id/knowledge", "plan unavailable");
     const { plan } = planState;
@@ -69,6 +72,7 @@ export async function POST(request: Request, { params }: Context) {
 
     const sourceId = reserved.source.id;
     after(() => processTextSource({ projectId: id, sourceId, text }));
+    trackServer("knowledge_added", project.owner_id, knowledgeAdded({ projectId: id, sourceId, type: "text" }));
     const body: AddKnowledgeTextResponse = { source: toKnowledgeSource(reserved.source) };
     return NextResponse.json(body, { status: 201 });
   } catch (error) {

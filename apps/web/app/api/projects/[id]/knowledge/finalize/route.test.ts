@@ -42,6 +42,9 @@ vi.mock("../../../../../../lib/knowledge/background", () => ({
   processTextSource: vi.fn(),
 }));
 
+const trackServer = vi.fn();
+vi.mock("../../../../../../lib/analytics/server", () => ({ trackServer: (...args: unknown[]) => trackServer(...args) }));
+
 import { POST } from "./route";
 
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -65,7 +68,8 @@ const errorCode = async (res: Response) => ApiErrorSchema.parse(await res.json()
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   afterTasks.length = 0;
-  getOwnedProject.mockReset().mockResolvedValue({ id: ID });
+  getOwnedProject.mockReset().mockResolvedValue({ id: ID, owner_id: "user_1" });
+  trackServer.mockReset();
   existing = { data: null, error: null };
   rpc.mockReset().mockResolvedValue({ data: [claimed()], error: null });
   download.mockReset().mockResolvedValue({ data: blobOf("%PDF-1.4 hello"), error: null });
@@ -86,6 +90,25 @@ describe("POST /api/projects/:id/knowledge/finalize", () => {
     expect(afterTasks).toHaveLength(1);
     await afterTasks[0]?.();
     expect(processFileSource).toHaveBeenCalledWith(expect.objectContaining({ projectId: ID, sourceId: SOURCE_ID, type: "pdf" }));
+  });
+
+  it("fires knowledge_added for the owner once the file passes, with ids and type only", async () => {
+    expect((await post(ID, { sourceId: SOURCE_ID })).status).toBe(200);
+    expect(trackServer).toHaveBeenCalledTimes(1);
+    expect(trackServer).toHaveBeenCalledWith("knowledge_added", "user_1", {
+      project_id: ID,
+      source_id: SOURCE_ID,
+      source_type: "pdf",
+    });
+  });
+
+  it("doesn't fire knowledge_added for a refused file or a repeat finalize", async () => {
+    download.mockResolvedValue({ data: blobOf("not a pdf"), error: null });
+    expect((await post(ID, { sourceId: SOURCE_ID })).status).toBe(400);
+    rpc.mockResolvedValue({ data: [], error: null });
+    existing = { data: { id: SOURCE_ID }, error: null };
+    expect((await post(ID, { sourceId: SOURCE_ID })).status).toBe(409);
+    expect(trackServer).not.toHaveBeenCalled();
   });
 
   it("accepts a TXT file without the PDF check", async () => {

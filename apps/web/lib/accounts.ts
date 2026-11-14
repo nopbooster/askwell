@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import type { Plan } from "@askwell/shared";
 import { createOwnerClient } from "./supabase/owner";
 import { createServiceClient } from "./supabase/service";
+import { signedUp } from "./analytics";
+import { trackServer } from "./analytics/server";
 
 /**
  * Makes sure the signed-in owner has an `accounts` row.
@@ -12,6 +14,7 @@ import { createServiceClient } from "./supabase/service";
  * Owners cannot insert into `accounts` (RLS), so this is a service-client write, and it
  * only runs after the session is verified. Insert on conflict do nothing: it never sends
  * or overwrites `plan` (the column default gives `free`; only the Clerk webhook changes it).
+ * Fires `signed_up` once, when this call actually created the row (the conflict case returns no row).
  * Throws when nobody is signed in or the insert fails.
  *
  * Request-scoped (React `cache`): the layout and the page render in parallel, so every caller in
@@ -23,12 +26,14 @@ export const ensureAccount = cache(async (): Promise<void> => {
   if (!userId) {
     throw new Error("ensureAccount: no signed-in owner (Clerk session missing)");
   }
-  const { error } = await createServiceClient()
+  const { data, error } = await createServiceClient()
     .from("accounts")
-    .upsert({ clerk_user_id: userId }, { onConflict: "clerk_user_id", ignoreDuplicates: true });
+    .upsert({ clerk_user_id: userId }, { onConflict: "clerk_user_id", ignoreDuplicates: true })
+    .select("clerk_user_id");
   if (error) {
     throw new Error(`ensureAccount: could not create the account row (${error.message})`);
   }
+  if (data && data.length > 0) trackServer("signed_up", userId, signedUp());
 });
 
 export type PlanState = { status: "ok"; plan: Plan } | { status: "error" };
