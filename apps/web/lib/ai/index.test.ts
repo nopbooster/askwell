@@ -24,7 +24,11 @@ vi.mock("@anthropic-ai/sdk", () => ({
 }));
 
 import {
+  CHAT_LONG_PROMPT_TOKENS,
   CHAT_MAX_TOKENS,
+  CHAT_PRICES,
+  chatCostUsd,
+  chatTokenPrices,
   CHAT_MODEL,
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_DIMENSIONS,
@@ -165,5 +169,22 @@ describe("embeddings stay on OpenAI", () => {
     vi.resetModules();
     const fresh = await import("./index");
     await expect(fresh.embedTexts(["a"])).rejects.toThrow("OPENAI_API_KEY");
+  });
+});
+
+describe("chat prices", () => {
+  it("are Claude Haiku 5.5 list prices per token", () => {
+    expect(CHAT_PRICES.input * 1_000_000).toBeCloseTo(0.1, 12);
+    expect(CHAT_PRICES.output * 1_000_000).toBeCloseTo(0.5, 12);
+  });
+  it("switch to the long-prompt rate only above the threshold", () => {
+    expect(chatTokenPrices(CHAT_LONG_PROMPT_TOKENS)).toEqual({ input: CHAT_PRICES.input, output: CHAT_PRICES.output });
+    expect(chatTokenPrices(CHAT_LONG_PROMPT_TOKENS + 1)).toEqual({ input: CHAT_PRICES.longInput, output: CHAT_PRICES.longOutput });
+  });
+  it("cost = tokens × price", () => {
+    expect(chatCostUsd({ inputTokens: 10_000, outputTokens: 10_000 })).toBeCloseTo(0.001 + 0.005, 12);
+    // Above the threshold the whole request is at the long rate.
+    expect(chatCostUsd({ inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBeCloseTo(0.5 + 2.5, 10);
+    expect(chatCostUsd({ inputTokens: 0, outputTokens: 0 })).toBe(0);
   });
 });

@@ -12,6 +12,32 @@ export const EMBEDDING_DIMENSIONS = 1536;
 /** The embeddings API takes up to 2048 inputs per request; stay well under it. */
 export const EMBEDDING_BATCH_SIZE = 100;
 
+/**
+ * Claude Haiku 5.5 list prices in USD per token (Anthropic API, 2026-11). Prompts over
+ * `CHAT_LONG_PROMPT_TOKENS` input tokens are billed at the higher rate for the whole request.
+ * Sent with each AI trace so PostHog shows a cost even if it doesn't know the model yet.
+ */
+export const CHAT_PRICES = {
+  input: 0.1 / 1_000_000,
+  output: 0.5 / 1_000_000,
+  longInput: 0.5 / 1_000_000,
+  longOutput: 2.5 / 1_000_000,
+} as const;
+export const CHAT_LONG_PROMPT_TOKENS = 100_000;
+
+/** Per-token prices for one chat call, by its input size. */
+export function chatTokenPrices(inputTokens: number): { input: number; output: number } {
+  return inputTokens > CHAT_LONG_PROMPT_TOKENS
+    ? { input: CHAT_PRICES.longInput, output: CHAT_PRICES.longOutput }
+    : { input: CHAT_PRICES.input, output: CHAT_PRICES.output };
+}
+
+/** The cost of one chat call in USD. */
+export function chatCostUsd(usage: TokenUsage): number {
+  const price = chatTokenPrices(usage.inputTokens);
+  return usage.inputTokens * price.input + usage.outputTokens * price.output;
+}
+
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type ChatResult = { text: string; usage: TokenUsage };

@@ -6,18 +6,18 @@ import type { ChatMessage } from "../ai";
 
 /** Everything below runs with the service client, only after the route has resolved the project by key. */
 
-export type ChatProject = { id: string; plan: Plan };
+export type ChatProject = { id: string; plan: Plan; ownerId: string };
 
 /** Resolves a project by its public key. `null` when unknown. The plan is read here, on the server. */
 export async function findProjectByKey(publicKey: string): Promise<ChatProject | null> {
   const { data, error } = await createServiceClient()
     .from("projects")
-    .select("id, accounts(plan)")
+    .select("id, owner_id, accounts(plan)")
     .eq("public_key", publicKey)
     .maybeSingle();
   if (error) throw new Error(`findProjectByKey: read failed (${error.message})`);
   if (!data) return null;
-  return { id: data.id, plan: data.accounts?.plan === "pro" ? "pro" : "free" };
+  return { id: data.id, plan: data.accounts?.plan === "pro" ? "pro" : "free", ownerId: data.owner_id };
 }
 
 /** Does this conversation belong to this project? */
@@ -85,4 +85,20 @@ export async function saveChatTurn(args: {
   });
   if (error || !data) throw new Error(`saveChatTurn: rpc failed (${error?.message ?? "no id"})`);
   return data;
+}
+
+/**
+ * Is this the project's first conversation? True for exactly one conversation per project (the
+ * oldest, ties broken by id), so `first_chat` fires once even when two first chats race.
+ */
+export async function isFirstConversation(projectId: string, conversationId: string): Promise<boolean> {
+  const { data, error } = await createServiceClient()
+    .from("conversations")
+    .select("id")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(1);
+  if (error) throw new Error(`isFirstConversation: read failed (${error.message})`);
+  return data[0]?.id === conversationId;
 }
