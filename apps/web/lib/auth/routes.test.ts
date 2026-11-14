@@ -54,3 +54,12 @@ describe("public routes", () => {
     expect(isProtectedRoute(path)).toBe(false);
   });
 });
+
+describe("Clerk webhook (§8 System)", () => {
+  it("is public and never treated as an owner route, so deliveries without a session get through", () => {
+    expect(isPublicRoute("/api/clerk/webhook")).toBe(true);
+    expect(isOwnerApiRoute("/api/clerk/webhook")).toBe(false);
+    expect(isDashboardRoute("/api/clerk/webhook")).toBe(false);
+    expect(isProtectedRoute("/api/clerk/webhook")).toBe(false);
+  });
+});
