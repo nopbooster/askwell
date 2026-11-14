@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAX_VISITOR_ID_CHARS, parseWidgetMessage } from "@askwell/shared";
+import { APP_NAME, MAX_VISITOR_ID_CHARS, parseWidgetMessage } from "@askwell/shared";
 import {
   CHAT_ERROR_MESSAGES,
   ChatError,
@@ -10,6 +10,7 @@ import {
   createMockChat,
 } from "./chat-client";
 import { MessageList } from "./message-list";
+import { Panel } from "./panel";
 import { parseParentOrigin, readEmbedParams } from "./params";
 import { createParentChannel, isTrustedParentMessage } from "./parent-channel";
 import {
@@ -311,5 +312,28 @@ describe("MessageList", () => {
     expect(
       renderToStaticMarkup(<MessageList messages={[]} typing={false} />),
     ).not.toContain("typing");
+  });
+});
+
+describe("Panel config", () => {
+  const render = (config: { headerText: string; showBadge: boolean }) =>
+    renderToStaticMarkup(<Panel publicKey={KEY} parentOrigin={null} config={config} chat={createMockChat()} />);
+
+  it("shows the configured header text", () => {
+    expect(render({ headerText: "Hi from Pro", showBadge: true })).toContain("Hi from Pro");
+  });
+
+  it("renders the header as text, never HTML", () => {
+    const html = render({ headerText: "<img src=x onerror=alert(1)>", showBadge: true });
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+
+  it("shows the badge when showBadge is true (always the case for Free)", () => {
+    expect(render({ headerText: "Ask us anything", showBadge: true })).toContain(`Powered by ${APP_NAME}`);
+  });
+
+  it("hides the badge only when showBadge is false (Pro)", () => {
+    expect(render({ headerText: "Ask us anything", showBadge: false })).not.toContain("Powered by");
   });
 });

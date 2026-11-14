@@ -59,6 +59,7 @@ i.on{display:block}
 .p{position:fixed;width:380px;height:600px;max-width:calc(100vw - 24px);max-height:calc(100vh - 100px);border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.3);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,transform .2s,visibility .2s}
 .p.o{opacity:1;visibility:visible;pointer-events:auto;transform:none}
 .slide{transform:translateY(24px)}
+.t.slide{transform:translateY(-24px)}
 .scale{transform:scale(.9)}
 iframe{width:100%;height:100%;border:0;display:block}
 @media(max-width:479px){.p{inset:0!important;width:100%!important;height:100%!important;max-width:none;max-height:none;border-radius:0}}
@@ -80,8 +81,10 @@ export async function init(
   let config: WidgetConfig | null;
   try {
     base = new URL(script.src).origin;
+    // Revalidate every load, so a config saved in the dashboard shows on the next page load.
     const res = await fetch(
       `${base}/api/widget/config?key=${encodeURIComponent(key)}`,
+      { cache: "no-cache" },
     );
     config = res.status === 200 ? parseConfig(await res.json()) : null;
   } catch {
@@ -111,8 +114,11 @@ export async function init(
   button.append(text, dot);
 
   const panel = document.createElement("div");
-  panel.className = `p ${animation === "fade" ? "" : animation}`;
-  panel.style.cssText = `${v}:${20 + 48 + 12}px;${h}:20px`;
+  // Slide comes from the button's side; scale grows out of the button's corner.
+  panel.className = ["p", v === "top" ? "t" : "", animation === "fade" ? "" : animation]
+    .filter(Boolean)
+    .join(" ");
+  panel.style.cssText = `${v}:${20 + 48 + 12}px;${h}:20px;transform-origin:${v} ${h}`;
   root.append(style, button, panel);
 
   let frame: HTMLIFrameElement | null = null;
