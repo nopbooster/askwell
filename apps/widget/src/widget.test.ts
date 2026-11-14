@@ -272,6 +272,15 @@ describe("panel", () => {
     expect(panel(h).style.transformOrigin).toBe("top right");
   });
 
+  it("the open state clears every animation offset (open rule comes last in the CSS)", async () => {
+    const h = await start();
+    const css = h.root.querySelector("style")?.textContent ?? "";
+    const open = css.indexOf(".p.o{");
+    expect(open).toBeGreaterThan(-1);
+    for (const rule of [".slide{", ".t.slide{", ".scale{"]) expect(css.indexOf(rule)).toBeLessThan(open);
+    expect(css.slice(open)).toMatch(/^\.p\.o\{[^}]*transform:none/);
+  });
+
   it("names the iframe after the configured label", async () => {
     const h = await start();
     button(h).click();
