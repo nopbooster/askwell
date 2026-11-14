@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { after, NextResponse } from "next/server";
 import {
   ChatRequestSchema,
   MAX_MESSAGE_CHARS,
@@ -14,11 +15,19 @@ import {
   consumeMessage,
   conversationBelongsToProject,
   findProjectByKey,
+  isFirstConversation,
   loadHistory,
   matchChunks,
   saveChatTurn,
 } from "../../../../lib/chat/data";
 import { buildSystemPrompt, DONT_KNOW_REPLY, MODEL_ERROR_MESSAGE } from "../../../../lib/chat/prompt";
+import {
+  trackFirstChat,
+  trackGeneration,
+  trackMessageBlocked,
+  visitorDistinctId,
+  type GenerationTrace,
+} from "../../../../lib/chat/telemetry";
 
 // Public route: any origin may call it, no credentials (project.md §9 CORS).
 const CORS_HEADERS = {
@@ -42,6 +51,24 @@ export function OPTIONS() {
   });
 }
 
+/**
+ * Runs analytics after the response is sent (Next.js `after`; on Vercel the function stays alive
+ * until it settles, so events are flushed). Never delays or changes the reply, and never throws.
+ */
+function track(task: () => Promise<unknown>) {
+  try {
+    after(async () => {
+      try {
+        await task();
+      } catch (error) {
+        logFailure("analytics", error);
+      }
+    });
+  } catch (error) {
+    logFailure("analytics", error);
+  }
+}
+
 /** Logs only the failing step and the error name/message; never the visitor's text. */
 function logFailure(step: string, error: unknown) {
   console.error(`[widget/chat] ${step} failed`, error instanceof Error ? error.message : "");
@@ -62,14 +89,16 @@ export async function POST(request: Request) {
     route: "chat",
     publicKey: keyCheck.success ? keyCheck.data : "invalid",
   });
+  const visitor = visitorDistinctId(body.visitorId);
+  const blockedKey = keyCheck.success ? keyCheck.data : null;
   if (limit.status === "rate_limited") {
-    // Phase 4: PostHog message_blocked event
+    track(() => trackMessageBlocked(visitor, "rate_limit", blockedKey));
     return errorResponse(429, "rate_limited", "Too many messages. Try again in a minute.");
   }
   if (typeof body.message === "string" && body.message.length <= MAX_MESSAGE_CHARS * 4) {
     const injection = await detectPromptInjection(request, body.message);
     if (injection.status === "injection") {
-      // Phase 4: PostHog message_blocked event
+      track(() => trackMessageBlocked(visitor, "prompt_injection", blockedKey));
       return errorResponse(400, "message_blocked", "That message can't be sent. Try rephrasing your question.");
     }
   }
@@ -103,6 +132,13 @@ export async function POST(request: Request) {
   }
 
   // 4-5. Retrieve and answer. From here a failure still uses the message (no refund).
+  // 7 (prepared here, sent after the response). One trace per model call; no call, no trace.
+  let generation: Omit<GenerationTrace, "conversationId"> | null = null;
+  const sendGeneration = (savedConversationId: string | null) => {
+    const trace = generation;
+    if (trace) track(() => trackGeneration(visitorId, { ...trace, conversationId: savedConversationId }));
+  };
+
   let reply: string;
   try {
     const [embedding] = await embedTexts([message]);
@@ -111,15 +147,24 @@ export async function POST(request: Request) {
       reply = DONT_KNOW_REPLY;
     } else {
       const history = conversationId ? await loadHistory(conversationId) : [];
-      const result = await chatComplete({
-        system: buildSystemPrompt(chunks),
-        messages: [...history, { role: "user", content: message }],
-      });
-      // Phase 4: PostHog AI trace (result.usage, project.id, conversationId)
-      reply = result.text.trim() || DONT_KNOW_REPLY;
+      const base = { traceId: randomUUID(), projectId: project.id, chunks: chunks.length, historyMessages: history.length };
+      const started = performance.now();
+      try {
+        const result = await chatComplete({
+          system: buildSystemPrompt(chunks),
+          messages: [...history, { role: "user", content: message }],
+        });
+        generation = { ...base, usage: result.usage, latencyMs: performance.now() - started, errorName: null };
+        reply = result.text.trim() || DONT_KNOW_REPLY;
+      } catch (error) {
+        const errorName = error instanceof Error ? error.constructor.name || error.name : "Error";
+        generation = { ...base, usage: null, latencyMs: performance.now() - started, errorName };
+        throw error;
+      }
     }
   } catch (error) {
     logFailure("answer", error);
+    sendGeneration(conversationId ?? null);
     return errorResponse(502, "internal", MODEL_ERROR_MESSAGE);
   }
 
@@ -132,9 +177,19 @@ export async function POST(request: Request) {
       message,
       reply,
     });
+    sendGeneration(savedId);
+    if (!conversationId) {
+      // A new conversation: `first_chat` when it is the project's first (exactly one is).
+      const ownerId = project.ownerId;
+      const projectId = project.id;
+      track(async () => {
+        if (await isFirstConversation(projectId, savedId)) await trackFirstChat(ownerId, projectId, savedId);
+      });
+    }
     return json({ conversationId: savedId, reply }, 200);
   } catch (error) {
     logFailure("save", error);
+    sendGeneration(conversationId ?? null);
     return errorResponse(500, "internal", "Something went wrong.");
   }
 }
