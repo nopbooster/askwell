@@ -37,15 +37,17 @@ Test IDs: owner `user_3M5RSbNvydBqGdRmnEknZoNm4mW`, project `35c17d2a-812e-42fc-
 
 | Step | In the app | In PostHog |
 |---|---|---|
-| 1. Landing `/` | Pass: PostHog loaded, events and replay snapshots sent | Pending |
-| 2. Sign up | Pass: landed on `/dashboard` | Pending (`signed_up`) |
-| 3. Create project | Pass: `POST /api/projects` → 201 | Pending (`project_created`) |
-| 4. Paste knowledge | Pass: 201, then `ready` | Pending (`knowledge_added`) |
-| 5. Install → Copy | Pass: "Copied to clipboard." The browser's PostHog `distinct_id` is now the Clerk user ID | Pending (`snippet_copied`) |
-| 6. Chat from the demo page | Pass: "How long does delivery to Canada take?" → "Delivery to Canada takes 5 business days and costs 12 dollars. Orders over 80 dollars ship free!" (from the pasted text) | Pending (`first_chat`, `$ai_generation` with cost) |
-| 7. Prompt-injection message | Pass: 400 `message_blocked`, the widget shows "I can't help with that request." | Pending (`message_blocked`, `reason: prompt_injection`) |
-| Replay | Landing, sign-up and dashboard recorded (`/s/` uploads) | Pending |
-| Funnel steps 1–6 | | Pending (product owner builds it) |
+| 1. Landing `/` | Pass: PostHog loaded, events and replay snapshots sent | Pass: `$pageview` on `/`, merged into the owner |
+| 2. Sign up | Pass: landed on `/dashboard` | Pass: `signed_up` |
+| 3. Create project | Pass: `POST /api/projects` → 201 | Pass: `project_created` |
+| 4. Paste knowledge | Pass: 201, then `ready` | Pass: `knowledge_added` |
+| 5. Install → Copy | Pass: "Copied to clipboard." The browser's PostHog `distinct_id` is now the Clerk user ID | Pass: `snippet_copied` |
+| 6. Chat from the demo page | Pass: "How long does delivery to Canada take?" → "Delivery to Canada takes 5 business days and costs 12 dollars. Orders over 80 dollars ship free!" (from the pasted text) | Pass: `first_chat` on the owner; `widget_chat_reply` trace with tokens and cost |
+| 7. Prompt-injection message | Pass: 400 `message_blocked`, the widget shows "I can't help with that request." | Pass: `message_blocked`, `reason: prompt_injection` |
+| Replay | Landing, sign-up and dashboard recorded (`/s/` uploads) | Pass |
+| Funnel steps 1–6 | | Pass: saved as "Askwell funnel"; the test owner completes steps 1–6, and `upgraded` is empty |
+
+PostHog results confirmed by the product owner on 2026-11-14 (items A–E: all Pass).
 
 ### Notes
 
