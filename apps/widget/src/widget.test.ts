@@ -91,10 +91,10 @@ describe("start-up", () => {
     expect(document.body.children).toHaveLength(0);
   });
 
-  it("fetches the config from the script's origin", async () => {
+  it("fetches the config from the script's origin, revalidating every load", async () => {
     const f = mockFetch(() => ok(config));
     await init(scriptTag({ src: `${BASE}/some/path/widget.js?v=2` }));
-    expect(f).toHaveBeenCalledWith(`${BASE}/api/widget/config?key=${KEY}`);
+    expect(f).toHaveBeenCalledWith(`${BASE}/api/widget/config?key=${KEY}`, { cache: "no-cache" });
   });
 
   it("renders nothing, with one warning, when fetch fails", async () => {
@@ -201,6 +201,23 @@ describe("button", () => {
     expect(panel(h).style.bottom).toBe("80px");
   });
 
+  it.each([
+    ["top-left", "top", "left"],
+    ["top-right", "top", "right"],
+    ["bottom-left", "bottom", "left"],
+    ["bottom-right", "bottom", "right"],
+  ] as const)("position %s: button in that corner, panel next to it", async (position, v, hz) => {
+    mockFetch(() => ok({ ...config, position }));
+    const h = await mustInit();
+    const other = { top: "bottom", bottom: "top", left: "right", right: "left" } as const;
+    expect(button(h).style[v]).toBe("20px");
+    expect(button(h).style[hz]).toBe("20px");
+    expect(button(h).style[other[v]]).toBe("");
+    expect(button(h).style[other[hz]]).toBe("");
+    expect(panel(h).style[v]).toBe("80px");
+    expect(panel(h).style[hz]).toBe("20px");
+  });
+
   it("sets no globals", async () => {
     const before = Object.keys(window);
     await start();
@@ -236,6 +253,38 @@ describe("panel", () => {
     mockFetch(() => ok({ ...config, animation: "slide" }));
     const h = await mustInit();
     expect(panel(h).classList.contains("slide")).toBe(true);
+  });
+
+  it.each([
+    ["fade", []],
+    ["slide", ["slide"]],
+    ["scale", ["scale"]],
+  ] as const)("animation %s → panel classes %j", async (animation, classes) => {
+    mockFetch(() => ok({ ...config, position: "bottom-right", animation }));
+    const h = await mustInit();
+    expect([...panel(h).classList].filter((c) => c !== "p")).toEqual(classes);
+  });
+
+  it("slides from above in a top corner, and scales out of the button's corner", async () => {
+    mockFetch(() => ok({ ...config, position: "top-right", animation: "slide" }));
+    const h = await mustInit();
+    expect(panel(h).classList.contains("t")).toBe(true);
+    expect(panel(h).style.transformOrigin).toBe("top right");
+  });
+
+  it("the open state clears every animation offset (open rule comes last in the CSS)", async () => {
+    const h = await start();
+    const css = h.root.querySelector("style")?.textContent ?? "";
+    const open = css.indexOf(".p.o{");
+    expect(open).toBeGreaterThan(-1);
+    for (const rule of [".slide{", ".t.slide{", ".scale{"]) expect(css.indexOf(rule)).toBeLessThan(open);
+    expect(css.slice(open)).toMatch(/^\.p\.o\{[^}]*transform:none/);
+  });
+
+  it("names the iframe after the configured label", async () => {
+    const h = await start();
+    button(h).click();
+    expect(h.iframe()?.title).toBe("Help me");
   });
 
   it("closes on Escape", async () => {
