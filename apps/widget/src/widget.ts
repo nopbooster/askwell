@@ -62,7 +62,7 @@ i.on{display:block}
 .t.slide{transform:translateY(-24px)}
 .scale{transform:scale(.9)}
 .p.o{opacity:1;visibility:visible;pointer-events:auto;transform:none}
-iframe{width:100%;height:100%;border:0;display:block}
+iframe{width:100%;height:100%;border:0;display:block;}
 @media(max-width:479px){.p{inset:0!important;width:100%!important;height:100%!important;max-width:none;max-height:none;border-radius:0}}
 @media(prefers-reduced-motion:reduce){.p{transition:none}}
 `;
