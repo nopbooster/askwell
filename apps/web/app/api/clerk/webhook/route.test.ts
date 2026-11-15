@@ -89,6 +89,12 @@ describe("POST /api/clerk/webhook — signed events", () => {
     await POST(signed(proItem("subscriptionItem.active", { payer: { user_id: "user_abc", email: "owner@example.com" } })));
     expect(JSON.stringify(log.mock.calls)).not.toContain("owner@example.com");
   });
+  it("logs the Clerk delivery id (svix-id) with the event type and outcome", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    const req = signed(proItem("subscriptionItem.active"));
+    await POST(req);
+    expect(log).toHaveBeenCalledWith("[clerk/webhook]", req.headers.get("svix-id"), "subscriptionItem.active", "set", "Pro item active");
+  });
 });
 
 describe("POST /api/clerk/webhook — unverified requests change nothing", () => {
