@@ -42,6 +42,18 @@ export type CustomizeFormProps = {
   initialConfig: WidgetConfig;
 };
 
+/**
+ * The Customize form (project.md §6.8).
+ *
+ * Who decides what:
+ * - The plan comes from the server (`getOwnerPlan()` in the page, from `accounts.plan`, which only the
+ *   Clerk webhook changes). This form only mirrors it: Free renders locked, Pro renders editable.
+ * - Saving is decided by `PATCH /api/projects/:id/config`, which reads the plan again and answers 402
+ *   for Free. A 402 locks the form here too, so a plan that changed after the page loaded (an ended
+ *   subscription, say) can never be worked around from the browser.
+ * - After an upgrade or downgrade the page shows the new state on the next load (it renders per request).
+ *   What visitors see comes from `GET /api/widget/config`, which applies the plan the same way.
+ */
 export function CustomizeForm({ projectId, plan, initialConfig }: CustomizeFormProps) {
   const ids = useId();
   const [saved, setSaved] = useState(initialConfig);
