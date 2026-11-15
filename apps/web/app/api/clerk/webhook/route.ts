@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
       return internalError("POST /api/clerk/webhook", error);
     }
   }
-  // Log the event type and outcome only; the payload holds personal data (email, name).
-  console.info("[clerk/webhook]", event.type, decision.action, decision.reason);
+  // Log the delivery id, event type and outcome only; the payload holds personal data (email, name).
+  // The svix-id matches the message id in Clerk's dashboard (Webhooks → endpoint → Message attempts).
+  console.info("[clerk/webhook]", request.headers.get("svix-id") ?? "-", event.type, decision.action, decision.reason);
   return NextResponse.json({ received: true }, { headers: { "Cache-Control": "no-store" } });
 }
