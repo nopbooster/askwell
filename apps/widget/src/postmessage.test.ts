@@ -135,7 +135,7 @@ describe("loader: incoming messages need the exact app origin and the panel's wi
 // ---------- Panel (apps/web/components/embed) ----------
 
 describe("panel: the target origin can never become '*' or 'null'", () => {
-  it.each(["*", "null", "https://example.com/", "https://example.com/path", "javascript:alert(1)", "file:///etc", "data:text/html,x", "", undefined])(
+  it.each(["*", "null", "https://*.example.com", "https://example.com/", "https://example.com/path", "javascript:alert(1)", "file:///etc", "data:text/html,x", "", undefined])(
     "parseParentOrigin(%j) is rejected, so the channel never posts",
     (value) => {
       expect(parseParentOrigin(value)).toBeNull();
@@ -147,15 +147,12 @@ describe("panel: the target origin can never become '*' or 'null'", () => {
     },
   );
 
-  it('a "*" inside a host is not a wildcard: the value is used literally (no real window has that origin)', () => {
-    // parseParentOrigin accepts it ("*" is a legal URL host character). postMessage treats only the
-    // exact string "*" as "any origin"; anything else must equal the receiver's origin, so this posts nowhere.
-    expect(parseParentOrigin("https://*.example.com")).toBe("https://*.example.com");
+  it('a "*" inside a host is rejected (P6H-T04), so the channel never posts', () => {
+    expect(parseParentOrigin("https://*.example.com")).toBeNull();
     const parent = { postMessage: vi.fn() };
     const channel = createParentChannel({ parent, addEventListener: vi.fn(), removeEventListener: vi.fn() }, parseParentOrigin("https://*.example.com"));
-    channel.post({ type: "close" });
-    expect(parent.postMessage).toHaveBeenCalledWith(expect.anything(), "https://*.example.com");
-    expect(parent.postMessage.mock.calls[0]?.[1]).not.toBe("*");
+    expect(channel.post({ type: "close" })).toBeNull();
+    expect(parent.postMessage).not.toHaveBeenCalled();
   });
 
   it("every message type is posted only to the exact parent origin", () => {

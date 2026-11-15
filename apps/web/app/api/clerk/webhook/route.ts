@@ -2,6 +2,7 @@ import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { NextResponse, type NextRequest } from "next/server";
 import { apiError, internalError } from "../../../../lib/api/http";
 import { setAccountPlan } from "../../../../lib/billing/accounts";
+import { currentPlanFromClerk } from "../../../../lib/billing/clerk";
 import { planDecisionForEvent } from "../../../../lib/billing";
 
 /**
@@ -9,20 +10,21 @@ import { planDecisionForEvent } from "../../../../lib/billing";
  * Public (no Clerk session); the Svix signature is the only check and runs before anything else.
  * 2xx tells Clerk it's handled; a 5xx makes Clerk retry.
  *
- * Events we act on (decision in `planDecisionForEvent`, lib/billing/plan-event.ts). Only Clerk
- * Billing **subscription item** events for the plan whose slug is exactly `pro` (`PRO_PLAN_SLUG`),
- * paid by a user (`data.payer.user_id`), change `accounts.plan`:
+ * Events are triggers, not the truth (docs/phase6-security-review.md §3): Svix retries and delivers
+ * out of order, so a late `subscriptionItem.ended` (or `.active`) for an old item must not decide
+ * the plan. For every verified `subscriptionItem.*` event paid by a user (`planDecisionForEvent`),
+ * the route reads the user's CURRENT subscription from Clerk's Backend API and writes the plan
+ * it implies (`planFromSubscription`):
  *
- * | Event                                            | accounts.plan                                         |
- * | ------------------------------------------------ | ----------------------------------------------------- |
- * | `subscriptionItem.active`                        | `pro`                                                 |
- * | `subscriptionItem.canceled`                      | unchanged until the paid period ends (`ended` follows); `free` if `period_end` already passed |
- * | `subscriptionItem.ended`, `subscriptionItem.expired` | `free`                                            |
- * | any other `subscriptionItem.*`, other event types | unchanged (200, ignored)                              |
+ * | Current Clerk subscription                                        | accounts.plan |
+ * | ----------------------------------------------------------------- | ------------- |
+ * | a `pro` item that is `active` or `past_due`                       | `pro`         |
+ * | a `pro` item that is `canceled` with its paid period still running | `pro`         |
+ * | anything else (Free only, ended/expired Pro, no subscription)     | `free`        |
  *
- * Other plan slugs (e.g. Clerk's `free_user`) are ignored: on an upgrade Clerk ends the Free item,
- * which must not downgrade the new Pro owner. In the Clerk dashboard, subscribe the endpoint to at
- * least `subscriptionItem.active`, `.canceled`, `.ended` and `.expired`.
+ * If Clerk's API fails, the route answers 500 and writes nothing, so Svix retries.
+ * In the Clerk dashboard, subscribe the endpoint to at least `subscriptionItem.active`,
+ * `.canceled`, `.ended` and `.expired`.
  */
 export async function POST(request: NextRequest) {
   if (!process.env.CLERK_WEBHOOK_SIGNING_SECRET) {
@@ -39,15 +41,24 @@ export async function POST(request: NextRequest) {
   }
 
   const decision = planDecisionForEvent(event);
-  if (decision.action === "set") {
+  let outcome: string = decision.action;
+  if (decision.action === "sync") {
+    let plan;
     try {
-      await setAccountPlan(decision.userId, decision.plan);
+      plan = await currentPlanFromClerk(decision.userId);
+    } catch (error) {
+      // No truth, no write: Svix retries the delivery.
+      return internalError("POST /api/clerk/webhook", error);
+    }
+    try {
+      await setAccountPlan(decision.userId, plan);
     } catch (error) {
       return internalError("POST /api/clerk/webhook", error);
     }
+    outcome = `sync → ${plan}`;
   }
   // Log the delivery id, event type and outcome only; the payload holds personal data (email, name).
   // The svix-id matches the message id in Clerk's dashboard (Webhooks → endpoint → Message attempts).
-  console.info("[clerk/webhook]", request.headers.get("svix-id") ?? "-", event.type, decision.action, decision.reason);
+  console.info("[clerk/webhook]", request.headers.get("svix-id") ?? "-", event.type, outcome, decision.reason);
   return NextResponse.json({ received: true }, { headers: { "Cache-Control": "no-store" } });
 }
