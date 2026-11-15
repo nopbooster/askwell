@@ -27,4 +27,17 @@ Playwright (full Chromium) with the Vercel bypass header sent only to the previe
 | 3a. Customize after the upgrade | 16:12:35 | **Pass.** No upgrade prompt; form editable |
 | 3b. Edit: color `#16a34a`, label "Need help?", header "Phase 5 says hi", bottom-left, slide, badge off → **Save** | 16:12:39 | **Pass.** `PATCH` → **200** with that config; "Saved. Reload your site to see the new look." |
 | 4. Reload the demo page on `localhost:5500` | 16:12:50 | **Pass.** `/api/widget/config` → `{"buttonColor":"#16a34a","position":"bottom-left","label":"Need help?","animation":"slide","headerText":"Phase 5 says hi","showBadge":false}`. Green "Need help?" button bottom-left; panel header "Phase 5 says hi"; **no badge** |
-| 5. Ended → defaults + badge | | Pending (see below) |
+| 5a. End the test Pro item now: Clerk Backend API `DELETE /v1/billing/subscription_items/csub_item_3M9O1a…?end_now=true` (dev instance, this test user only, approved by the product owner) | 16:17:14 | Clerk: item `pro` status **`ended`** at 16:17:15 |
+| `accounts.plan` after the end (read) | 16:17:18 | **`free`**, about 3 s later (`subscriptionItem.ended` webhook) |
+| 5b. Reload the demo page | 16:17:30 | **Pass.** `/api/widget/config` → `{"buttonColor":"#0a0a0a","position":"bottom-right","label":"Ask us","animation":"fade","headerText":"Ask us anything","showBadge":true}`. Black "Ask us" bottom-right; header "Ask us anything"; **badge shown** |
+| 5c. Customize after the end | 16:17:48 | **Pass.** Locked again with the upgrade prompt; the form shows the defaults |
+| 5d. Direct `PATCH` after the end | 16:17:52 | **Pass.** **402** `payment_required` |
+| `widget_configs` after the end (read) | 16:18 | Still holds the Pro values (`#16a34a`, bottom-left, "Need help?"…). The plan is applied when the config is read; nothing is deleted, so a re-upgrade brings the look back |
+
+**All steps pass.**
+
+### Notes
+
+- **Webhook endpoint.** Clerk's endpoint points at the P5B-T03 preview alias. It works because every preview shares the dev database and runs the same webhook code. If that preview is deleted, upgrades on dev will stop flipping `accounts.plan`. Production will need its own endpoint (Phase 6).
+- **Sandbox.** `hcaptcha.com` is blocked in my sandbox; Stripe's test checkout worked without it. `*.stripe.com` was reachable.
+- **Screenshots** were taken for every step (Free locked, checkout, paid, Pro billing, Customize edited and saved, the demo widget in Pro and after the end). I can't attach images from my sandbox; the table describes what each one shows.
