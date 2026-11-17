@@ -66,6 +66,12 @@ describe("landing demo", () => {
     expect(html).toContain("See it in action");
   });
 
+  it("only reads the server-side variable, never a NEXT_PUBLIC_ copy", async () => {
+    vi.stubEnv("LANDING_WIDGET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_LANDING_WIDGET_KEY", KEY);
+    expect(await landingWidget()).toBeNull();
+  });
+
   it("falls back to the mock (and doesn't throw) when the app URL can't be determined", async () => {
     vi.stubEnv("LANDING_WIDGET_KEY", KEY);
     getAppUrl.mockRejectedValue(new Error("no host"));
