@@ -100,7 +100,7 @@ export function ConversationsView({
   return (
     <div className="space-y-4">
       {refreshBar}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
         <div className={open ? "hidden lg:block" : undefined}>
           <ConversationList conversations={conversations} selectedId={selectedId} onSelect={select} />
         </div>

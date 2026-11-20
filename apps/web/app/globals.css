@@ -22,7 +22,16 @@
   --color-ink-900: #18181b;
   --color-ink-950: #09090b;
 
-  /* Semantic tokens: components use these, never the palette directly */
+  /* Blur */
+  --blur-glass: 16px;
+}
+
+/*
+ * Semantic tokens: components use these, never the palette directly.
+ * `inline` makes utilities read the raw variables (var(--canvas), …) where they are used, so a
+ * nested `.dark` scope (the landing page) switches them. A plain @theme resolves them at :root only.
+ */
+@theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
@@ -40,9 +49,6 @@
   /* Shadows */
   --shadow-glass: 0 1px 0 0 var(--glass-highlight) inset, 0 8px 32px -8px var(--shadow-color);
   --shadow-raised: 0 2px 8px -2px var(--shadow-color);
-
-  /* Blur */
-  --blur-glass: 16px;
 }
 
 :root {
@@ -76,16 +82,16 @@
 }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-fg);
+  background: var(--canvas);
+  color: var(--fg);
   font-family: var(--font-sans);
 }
 
 /* Glass surface: translucent fill + backdrop blur */
 @utility glass {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  box-shadow: var(--shadow-glass);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 0 0 var(--glass-highlight) inset, 0 8px 32px -8px var(--shadow-color);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
 }
