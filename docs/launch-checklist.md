@@ -128,8 +128,9 @@ The key must belong to a project in the **prod** database: a dev key returns "Un
 1. After step 7.1 (promoted, landing shows the static demo), sign up on the production URL with the account that will own the Askwell demo.
 2. Upgrade it to **Pro** (2,000 messages a month instead of 100; the landing gets all public traffic).
 3. Create a project called e.g. "Askwell (landing page)". In Knowledge, upload `docs/askwell-knowledge.md` and wait for **Ready**.
-4. Install tab → copy the `data-key` value (`pk_…`) from the script tag.
-5. Vercel → Production → `LANDING_WIDGET_KEY` = that value. It's read per request, so no redeploy is needed (a redeploy doesn't hurt).
+4. Customize (Pro): set a **light** button color (e.g. `#ffffff`). The default `#0a0a0a` is hard to see on the dark landing page (found in the Phase 6 rehearsal, `docs/phase6-core-flow-check.md` F1). Save.
+5. Install tab → copy the `data-key` value (`pk_…`) from the script tag.
+6. Vercel → Production → `LANDING_WIDGET_KEY` = that value. It's read per request, so no redeploy is needed (a redeploy doesn't hurt).
 
 **Check:** reload the production landing page: the real chat button shows in the corner, and asking "How much is Pro?" gets an answer from the knowledge file.
 
