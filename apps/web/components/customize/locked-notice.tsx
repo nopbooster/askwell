@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GlassPanel } from "../ui";
+import { buttonClasses, GlassPanel } from "../ui";
 
 /** Free plan: the form stays visible but locked. Billing is where they upgrade. */
 export function LockedNotice({ message }: { message?: string }) {
@@ -13,7 +13,7 @@ export function LockedNotice({ message }: { message?: string }) {
       </div>
       <Link
         href="/dashboard/billing"
-        className="inline-flex min-h-10 items-center rounded-control bg-accent px-4 text-sm font-medium text-accent-fg shadow-raised hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg"
+        className={buttonClasses()}
       >
         Upgrade to Pro
       </Link>

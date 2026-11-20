@@ -13,7 +13,7 @@ export function ThreadMessage({ message }: { message: ChatMessage }) {
   return (
     <li className={`flex flex-col ${visitor ? "items-end" : "items-start"}`}>
       <p
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-panel px-3.5 py-2 text-sm leading-relaxed ${
+        className={`max-w-[85%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded-panel px-3.5 py-2 text-sm leading-relaxed ${
           visitor ? "bg-accent text-accent-fg" : "glass text-fg"
         }`}
       >

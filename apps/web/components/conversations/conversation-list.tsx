@@ -28,7 +28,7 @@ export function ConversationList({
                   selected ? "bg-surface-strong" : "hover:bg-surface"
                 }`}
               >
-                <span className={`line-clamp-2 text-sm break-words ${empty ? "text-fg-muted italic" : "font-medium"}`}>
+                <span className={`line-clamp-2 text-sm [overflow-wrap:anywhere] ${empty ? "text-fg-muted italic" : "font-medium"}`}>
                   {previewLabel(c.firstMessagePreview)}
                 </span>
                 <span className="mt-1 flex flex-wrap gap-x-2 text-xs text-fg-muted">

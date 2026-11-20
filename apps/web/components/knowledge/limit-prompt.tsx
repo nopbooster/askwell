@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Plan } from "@askwell/shared";
-import { GlassPanel } from "../ui";
+import { buttonClasses, GlassPanel } from "../ui";
 import { sourceLimitLabel } from "./helpers";
 
 /**
@@ -19,7 +19,7 @@ export function SourceLimitPrompt({ count, plan, message }: { count: number; pla
       {plan === "free" ? (
         <Link
           href="/dashboard/billing"
-          className="inline-flex min-h-10 items-center rounded-control bg-accent px-4 text-sm font-medium text-accent-fg shadow-raised hover:opacity-90"
+          className={buttonClasses()}
         >
           Upgrade to Pro
         </Link>
