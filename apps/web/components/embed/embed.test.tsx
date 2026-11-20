@@ -305,6 +305,23 @@ describe("MessageList", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 
+  it("renders bot replies as safe markdown and visitor messages as typed", () => {
+    const html = renderToStaticMarkup(
+      <MessageList
+        typing={false}
+        messages={[
+          { id: "1", role: "visitor", text: "**Pro** - price?" },
+          { id: "2", role: "bot", text: "**Pro ($19/month):**\n- 5 projects\n- 2,000 messages\n\n1. Open Billing\n2. Pick Pro" },
+        ]}
+      />,
+    );
+    expect(html).toContain('<strong class="font-semibold">Pro ($19/month):</strong>');
+    expect(html).toContain("<li>5 projects</li><li>2,000 messages</li>");
+    expect(html).toContain("<li>Open Billing</li><li>Pick Pro</li></ol>");
+    expect(html).toContain("**Pro** - price?"); // the visitor's text is not parsed
+    expect(html.match(/<strong/g)).toHaveLength(1);
+  });
+
   it("shows the typing indicator only while waiting", () => {
     expect(
       renderToStaticMarkup(<MessageList messages={[]} typing />),
