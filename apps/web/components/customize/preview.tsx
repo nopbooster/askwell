@@ -64,7 +64,7 @@ export function WidgetPreview({ config }: { config: WidgetConfig }) {
       <button
         type="button"
         onClick={() => setRun((n) => n + 1)}
-        className="mt-2 text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+        className="mt-1 inline-flex min-h-10 items-center text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg"
       >
         Replay the open animation
       </button>

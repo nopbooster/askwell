@@ -1,4 +1,4 @@
-export { Button, type ButtonProps, type ButtonVariant } from "./button";
+export { Button, buttonClasses, type ButtonProps, type ButtonVariant } from "./button";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
 export { GlassPanel } from "./glass-panel";

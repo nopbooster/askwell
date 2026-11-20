@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Plan } from "@askwell/shared";
-import { GlassPanel } from "../ui";
+import { buttonClasses, GlassPanel } from "../ui";
 import { projectLimitLabel } from "./limits";
 
 /** Shown instead of the create form when the plan's project limit is reached. */
@@ -13,7 +13,7 @@ export function UpgradePrompt({ count, plan, message }: { count: number; plan: P
       </div>
       <Link
         href="/dashboard/billing"
-        className="inline-flex min-h-10 items-center rounded-control bg-accent px-4 text-sm font-medium text-accent-fg shadow-raised hover:opacity-90"
+        className={buttonClasses()}
       >
         Upgrade to Pro
       </Link>

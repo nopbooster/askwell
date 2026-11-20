@@ -8,7 +8,7 @@ export function LandingFooter() {
         <span>
           © {new Date().getFullYear()} {APP_NAME}
         </span>
-        <Link href="/sign-in" className="hover:text-fg">
+        <Link href="/sign-in" className="inline-flex min-h-10 items-center hover:text-fg">
           Sign in
         </Link>
       </div>
