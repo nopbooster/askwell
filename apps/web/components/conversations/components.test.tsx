@@ -71,9 +71,19 @@ describe("ThreadView", () => {
     expect(html).not.toContain("<script");
     expect(html.match(/&lt;img/g)).toHaveLength(2);
   });
-  it("keeps line breaks (pre-wrap) and shows an empty note with no messages", () => {
-    expect(render([msg(1, "bot", "a\nb")])).toContain("whitespace-pre-wrap");
+  it("keeps line breaks (visitor: pre-wrap, bot: <br>) and shows an empty note with no messages", () => {
+    expect(render([msg(1, "visitor", "a\nb")])).toContain("whitespace-pre-wrap");
+    expect(render([msg(1, "bot", "a\nb")])).toContain("<p>a<br/>b</p>");
     expect(render([])).toContain("No messages in this conversation yet.");
+  });
+  it("renders bot replies as safe markdown (bold labels, bullet lists), visitor text as typed", () => {
+    const reply = "**Free ($0):**\n- 1 project\n- 3 knowledge sources\n\nUpgrade any time.";
+    const html = render([msg(1, "visitor", "**plans?** - list"), msg(2, "bot", reply)]);
+    expect(html).toContain('<strong class="font-semibold">Free ($0):</strong>');
+    expect(html).toContain("<li>1 project</li><li>3 knowledge sources</li>");
+    expect(html).toContain("<p>Upgrade any time.</p>");
+    expect(html).toContain("**plans?** - list"); // the visitor's message is not parsed
+    expect(html.match(/<strong/g)).toHaveLength(1);
   });
 });
 

@@ -307,7 +307,7 @@ Every PR must follow these.
 | Prompt injection (visitor)   | Arcjet detects it before the AI call. System prompt limits scope. Bot never reveals the system prompt or other projects' data.     |
 | Prompt injection (documents) | Uploaded file text is data. The system prompt says so.                                       |
 | File upload                  | Check type and size on the server: declared size and extension at `upload-url`, real size and PDF bytes at `finalize`. Private bucket with its own size and type limits; one-time signed upload URLs; never public URLs. |
-| XSS                          | Visitor messages and bot replies render as text, never HTML, in widget and dashboard.        |
+| XSS                          | Visitor messages render as text. Bot replies are rendered as text nodes through a safe markdown subset (no HTML): bold, italic, inline code, paragraphs, line breaks, bullet and numbered lists, as React elements only; raw HTML and links show as literal text. Never HTML, in widget and dashboard. |
 | CORS                         | Public widget routes allow any origin. Owner routes do not.                                  |
 | postMessage                  | Loader and panel check `event.origin` on every message. Never `*` as target origin for data. |
 | Clickjacking                 | Only `/embed` may be framed by other sites. Other pages send `frame-ancestors 'self'`.       |

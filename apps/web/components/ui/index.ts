@@ -4,3 +4,4 @@ export { ErrorState } from "./error-state";
 export { GlassPanel } from "./glass-panel";
 export { LoadingState } from "./loading-state";
 export { PageHeader } from "./page-header";
+export { Markdown, parseInline, parseMarkdown, type Block, type Inline, type Line } from "./markdown";

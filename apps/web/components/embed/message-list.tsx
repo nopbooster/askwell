@@ -1,20 +1,30 @@
 import type { MessageRole } from "@askwell/shared";
+import { Markdown } from "../ui/markdown";
 
 export type PanelMessage = { id: string; role: MessageRole; text: string };
 
-/** One chat bubble. The text is always a React text node, never HTML. */
+/**
+ * One chat bubble. Never HTML: the visitor's text is a plain React text node; the bot's reply goes
+ * through the safe markdown subset (React elements only, project.md §9 XSS).
+ */
 export function MessageBubble({ message }: { message: PanelMessage }) {
   const mine = message.role === "visitor";
+  if (mine) {
+    return (
+      <li className="flex justify-end">
+        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-panel bg-accent px-3.5 py-2 text-sm leading-relaxed text-accent-fg">
+          <span className="sr-only">You: </span>
+          {message.text}
+        </p>
+      </li>
+    );
+  }
   return (
-    <li className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <p
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-panel px-3.5 py-2 text-sm leading-relaxed ${
-          mine ? "bg-accent text-accent-fg" : "glass text-fg"
-        }`}
-      >
-        <span className="sr-only">{mine ? "You: " : "Assistant: "}</span>
-        {message.text}
-      </p>
+    <li className="flex justify-start">
+      <div className="glass min-w-0 max-w-[85%] rounded-panel px-3.5 py-2 text-sm leading-relaxed text-fg">
+        <span className="sr-only">Assistant: </span>
+        <Markdown text={message.text} />
+      </div>
     </li>
   );
 }
