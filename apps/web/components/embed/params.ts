@@ -11,6 +11,9 @@ export function parseParentOrigin(
   try {
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    // "*" is a legal URL host character, but no real page has such an origin: reject it, so the
+    // value can never look like a wildcard (docs/phase6-security-review.md, observation from #54).
+    if (url.hostname.includes("*")) return null;
     return url.origin === value ? value : null;
   } catch {
     return null;

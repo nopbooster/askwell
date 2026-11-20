@@ -1,100 +1,87 @@
 import { describe, expect, it } from "vitest";
-import { PRO_PLAN_SLUG, planDecisionForEvent } from "./plan-event";
+import { PRO_PLAN_SLUG, planDecisionForEvent, planFromSubscription, type SubscriptionItemLike } from "./plan-event";
 
-const NOW = Date.UTC(2026, 10, 14, 12, 0, 0);
+const NOW = Date.UTC(2026, 10, 16, 12, 0, 0);
 const DAY = 86_400_000;
-const item = (type: string, over: Record<string, unknown> = {}) => ({
+const event = (type: string, data: Record<string, unknown> = {}) => ({
   type,
-  data: {
-    object: "commerce_subscription_item",
-    id: "csi_1",
-    status: "active",
-    plan: { id: "cplan_pro", slug: PRO_PLAN_SLUG, name: "Pro" },
-    payer: { user_id: "user_abc", email: "owner@example.com" },
-    period_start: NOW - 10 * DAY,
-    period_end: NOW + 20 * DAY,
-    ...over,
-  },
+  data: { object: "commerce_subscription_item", plan: { slug: PRO_PLAN_SLUG }, payer: { user_id: "user_abc" }, ...data },
 });
 
-describe("planDecisionForEvent", () => {
-  it("Pro item active → pro", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.active"), NOW)).toEqual({
-      action: "set",
-      userId: "user_abc",
-      plan: "pro",
-      reason: "Pro item active",
-    });
-  });
-  it("Pro item ended or expired → free", () => {
-    for (const type of ["subscriptionItem.ended", "subscriptionItem.expired"]) {
-      expect(planDecisionForEvent(item(type, { status: "ended" }), NOW)).toMatchObject({
-        action: "set",
+describe("planDecisionForEvent (the filter: which events trigger a sync)", () => {
+  it.each(["active", "canceled", "ended", "expired", "upcoming", "updated", "pastDue", "incomplete", "abandoned", "freeTrialEnding", "somethingNew"])(
+    "subscriptionItem.%s paid by a user → sync for that user (the event never decides the plan)",
+    (kind) => {
+      expect(planDecisionForEvent(event(`subscriptionItem.${kind}`))).toEqual({
+        action: "sync",
         userId: "user_abc",
-        plan: "free",
+        reason: `subscriptionItem.${kind} (pro)`,
       });
-    }
-  });
-  it("canceled while the paid period runs → no change (Pro stays until it ends)", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.canceled", { status: "canceled" }), NOW)).toEqual({
-      action: "ignore",
-      reason: "canceled: Pro stays until the paid period ends",
+    },
+  );
+  it("Free plan items trigger a sync too (their events come with Pro changes)", () => {
+    expect(planDecisionForEvent(event("subscriptionItem.ended", { plan: { slug: "free_user" } }))).toMatchObject({
+      action: "sync",
+      userId: "user_abc",
     });
   });
-  it("canceled after the period already ended → free", () => {
-    const d = planDecisionForEvent(item("subscriptionItem.canceled", { period_end: NOW - DAY }), NOW);
-    expect(d).toMatchObject({ action: "set", plan: "free" });
-    expect(planDecisionForEvent(item("subscriptionItem.canceled", { period_end: NOW }), NOW)).toMatchObject({ plan: "free" });
-  });
-  it("reads a period end sent in seconds too", () => {
-    const inSeconds = Math.floor((NOW + DAY) / 1000);
-    expect(planDecisionForEvent(item("subscriptionItem.canceled", { period_end: inSeconds }), NOW).action).toBe("ignore");
-    const pastSeconds = Math.floor((NOW - DAY) / 1000);
-    expect(planDecisionForEvent(item("subscriptionItem.canceled", { period_end: pastSeconds }), NOW)).toMatchObject({ plan: "free" });
-  });
-  it("canceled with no period end → no change", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.canceled", { period_end: null }), NOW).action).toBe("ignore");
-  });
-  it("upcoming (renewal notice) → no change", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.upcoming", { status: "upcoming" }), NOW)).toEqual({
-      action: "ignore",
-      reason: "no plan change for subscriptionItem.upcoming",
-    });
-  });
-  it("past due, updated, incomplete, abandoned, free trial ending → no change", () => {
-    for (const type of [
-      "subscriptionItem.pastDue",
-      "subscriptionItem.updated",
-      "subscriptionItem.incomplete",
-      "subscriptionItem.abandoned",
-      "subscriptionItem.freeTrialEnding",
-    ]) {
-      expect(planDecisionForEvent(item(type), NOW).action).toBe("ignore");
-    }
-  });
-  it("another plan's events are ignored, even ended (an upgrade ends the Free item)", () => {
-    for (const type of ["subscriptionItem.active", "subscriptionItem.ended"]) {
-      expect(planDecisionForEvent(item(type, { plan: { slug: "free_user" } }), NOW)).toEqual({
-        action: "ignore",
-        reason: "not the Pro plan",
-      });
-    }
-  });
-  it("unknown and non-item events are ignored", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.somethingNew"), NOW).action).toBe("ignore");
-    expect(planDecisionForEvent({ type: "user.created", data: { id: "user_abc" } }, NOW)).toEqual({
+  it("non-item events are ignored", () => {
+    expect(planDecisionForEvent({ type: "user.created", data: { id: "user_abc" } })).toEqual({
       action: "ignore",
       reason: "not a subscription item event",
     });
-    expect(planDecisionForEvent({ type: "subscription.active", data: { items: [] } }, NOW).action).toBe("ignore");
+    expect(planDecisionForEvent({ type: "subscription.active", data: { payer: { user_id: "user_abc" } } }).action).toBe("ignore");
   });
-  it("an organization payer (no user_id) or a malformed payload is ignored", () => {
-    expect(planDecisionForEvent(item("subscriptionItem.active", { payer: { organization_id: "org_1" } }), NOW)).toEqual({
+  it("an organization payer or a malformed payload is ignored", () => {
+    expect(planDecisionForEvent(event("subscriptionItem.active", { payer: { organization_id: "org_1" } }))).toEqual({
       action: "ignore",
       reason: "no user payer",
     });
-    for (const data of [undefined, null, "x", { plan: null }, { plan: { slug: "pro" }, payer: { user_id: 42 } }]) {
-      expect(planDecisionForEvent({ type: "subscriptionItem.active", data }, NOW).action).toBe("ignore");
+    for (const data of [undefined, null, "x", { payer: null }, { payer: { user_id: 42 } }, { payer: { user_id: "" } }]) {
+      expect(planDecisionForEvent({ type: "subscriptionItem.active", data }).action).toBe("ignore");
     }
+  });
+});
+
+describe("planFromSubscription (Clerk's current subscription → plan)", () => {
+  const item = (status: string, over: Partial<SubscriptionItemLike> = {}): SubscriptionItemLike => ({
+    status,
+    plan: { slug: PRO_PLAN_SLUG },
+    periodEnd: NOW + 20 * DAY,
+    ...over,
+  });
+  const free = (status = "active"): SubscriptionItemLike => ({ status, plan: { slug: "free_user" }, periodEnd: null });
+
+  it("active or past_due Pro item → pro", () => {
+    expect(planFromSubscription([item("active")], NOW)).toBe("pro");
+    expect(planFromSubscription([item("past_due")], NOW)).toBe("pro");
+  });
+  it("a cancellation in the paid period that Clerk still reports as active → pro", () => {
+    expect(planFromSubscription([item("active"), free("upcoming")], NOW)).toBe("pro");
+  });
+  it("canceled Pro item → pro while its period runs, free once it has ended", () => {
+    expect(planFromSubscription([item("canceled")], NOW)).toBe("pro");
+    expect(planFromSubscription([item("canceled", { periodEnd: NOW - DAY })], NOW)).toBe("free");
+    expect(planFromSubscription([item("canceled", { periodEnd: NOW })], NOW)).toBe("free");
+    expect(planFromSubscription([item("canceled", { periodEnd: null })], NOW)).toBe("free");
+  });
+  it("reads a period end in seconds too", () => {
+    expect(planFromSubscription([item("canceled", { periodEnd: Math.floor((NOW + DAY) / 1000) })], NOW)).toBe("pro");
+    expect(planFromSubscription([item("canceled", { periodEnd: Math.floor((NOW - DAY) / 1000) })], NOW)).toBe("free");
+  });
+  it.each(["ended", "expired", "upcoming", "incomplete", "abandoned"])("a %s Pro item alone → free", (status) => {
+    expect(planFromSubscription([item(status)], NOW)).toBe("free");
+  });
+  it("Free only, no items, or no subscription → free", () => {
+    expect(planFromSubscription([free()], NOW)).toBe("free");
+    expect(planFromSubscription([], NOW)).toBe("free");
+    expect(planFromSubscription(null, NOW)).toBe("free");
+  });
+  it("an old ended Pro item next to a new active one → pro (any live Pro item wins)", () => {
+    expect(planFromSubscription([item("ended", { periodEnd: NOW - 10 * DAY }), item("active")], NOW)).toBe("pro");
+  });
+  it("an item without a plan, or another plan's active item → free", () => {
+    expect(planFromSubscription([item("active", { plan: null })], NOW)).toBe("free");
+    expect(planFromSubscription([item("active", { plan: { slug: "enterprise" } })], NOW)).toBe("free");
   });
 });

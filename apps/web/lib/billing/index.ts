@@ -1,1 +1,8 @@
-export { PRO_PLAN_SLUG, planDecisionForEvent, type BillingEventLike, type PlanDecision } from "./plan-event";
+export {
+  PRO_PLAN_SLUG,
+  planDecisionForEvent,
+  planFromSubscription,
+  type BillingEventLike,
+  type PlanDecision,
+  type SubscriptionItemLike,
+} from "./plan-event";

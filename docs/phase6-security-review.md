@@ -3,7 +3,7 @@
 Reviewed on 2026-11-15 against `main` at `7aeb663` (after #52 security headers and #54 CORS/postMessage audit).
 Database evidence comes from **read-only** queries on the **dev** Supabase project, through the Supabase MCP. Production was not touched.
 
-**Summary:** all 14 §9 rules **PASS**. There is **1 GAP (low)**, outside the literal §9 text: Clerk webhook events can arrive out of order and set the wrong plan (§3). There are also 3 observations with optional hardening (§4).
+**Summary:** all 14 §9 rules **PASS**. There was **1 GAP (low)**, outside the literal §9 text: Clerk webhook events can arrive out of order and set the wrong plan (§3). It is **fixed in P6H-T04**. There are also 3 observations with optional hardening (§4).
 
 ## 1. §9 rules
 
@@ -76,7 +76,11 @@ No service client is used for owner reads with a manual owner filter.
 
 No other security lints (no missing RLS, no exposed `anon` access, no mutable search_path).
 
-## 3. GAP: Clerk webhook event ordering (low)
+## 3. GAP: Clerk webhook event ordering (low) — **FIXED in P6H-T04**
+
+> **Status: fixed.** The webhook now treats every verified `subscriptionItem.*` event paid by a user as a trigger only. It reads the user's **current** subscription with `clerkClient().billing.getUserBillingSubscription(userId)` and writes the plan that subscription implies (`lib/billing/clerk.ts`, `planFromSubscription` in `lib/billing/plan-event.ts`). A Clerk API failure returns 500 with no write, so Svix retries.
+> - **Tests** (`app/api/clerk/webhook/route.test.ts`, "late and retried events can't set the wrong plan"): both scenarios below, in both delivery orders, plus the API-failure case.
+> - **Live evidence:** in the P6H-T04 PR.
 
 **Question:** can a late `subscriptionItem.ended` for an old Pro item, arriving after a newer `.active`, set `free` wrongly?
 
@@ -111,4 +115,5 @@ This makes order and retries harmless: any late event just re-applies the curren
 
 - **O1. RLS helpers callable over RPC** (advisor WARN, §2.4). Optional hardening: move `owned_project_ids`/`owned_conversation_ids` into a non-exposed schema (e.g. `private`, with `grant usage` to `authenticated`) and point the policies at it. They're then out of the Data API while RLS keeps working. Low value, since they return only the caller's own IDs. Needs a migration (lead to plan).
 - **O2. Arcjet fails open** (`lib/arcjet/index.ts:63-70, 84-91`). If Arcjet errors, the rate limit and the injection check pass. Cost stays bounded by the monthly quota and the 1,000-character limit, and the system prompt still refuses prompt leaks. That's acceptable for availability. Suggestion: a PostHog or log alert on the `rate limit check errored` / `injection check errored` warnings, so an outage is noticed.
+- **Tidy (P6H-T04):** `parseParentOrigin` now rejects a `*` in the host (`components/embed/params.ts`), so a parent origin can never look like a wildcard.
 - **O3. `/embed` accepts any parent `origin=`** (from #54). By design, since `/embed` is frameable everywhere. The panel only posts UI messages (ready, close, resize, unread count), and a site claiming another origin receives nothing.
