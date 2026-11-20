@@ -1,18 +1,27 @@
 import "server-only";
 import type { KnowledgeSourceType } from "@askwell/shared";
 import { createServiceClient } from "../supabase/service";
+import { describeError } from "./errors";
 import { extractText } from "./extract";
 import { processSource } from "./process";
 
-/** Marks a source `failed` (best effort: it logs instead of throwing, so a background task never crashes). */
-async function markFailed(projectId: string, sourceId: string, cause: unknown): Promise<void> {
-  console.error("[knowledge] processing failed", { sourceId }, cause);
+/**
+ * Marks a source `failed` (best effort: it logs instead of throwing, so a background task never crashes).
+ * Logs the source id, the step and the error's name and message only: never the text.
+ */
+async function markFailed(
+  projectId: string,
+  sourceId: string,
+  step: "extract" | "process",
+  cause: unknown,
+): Promise<void> {
+  console.error("[knowledge] processing failed", { sourceId, step, error: describeError(cause) });
   const { error } = await createServiceClient()
     .from("knowledge_sources")
     .update({ status: "failed" })
     .eq("id", sourceId)
     .eq("project_id", projectId);
-  if (error) console.error("[knowledge] could not mark source failed", { sourceId }, error.message);
+  if (error) console.error("[knowledge] could not mark source failed", { sourceId, error: describeError(error) });
 }
 
 /**
@@ -23,7 +32,7 @@ export async function processTextSource(args: { projectId: string; sourceId: str
   try {
     await processSource(args);
   } catch (error) {
-    await markFailed(args.projectId, args.sourceId, error);
+    await markFailed(args.projectId, args.sourceId, "process", error);
   }
 }
 
@@ -39,10 +48,16 @@ export async function processFileSource(args: {
   bytes: Uint8Array;
 }): Promise<void> {
   const { projectId, sourceId, type, bytes } = args;
+  let text: string;
   try {
-    const text = await extractText(type, bytes);
+    text = await extractText(type, bytes);
+  } catch (error) {
+    await markFailed(projectId, sourceId, "extract", error);
+    return;
+  }
+  try {
     await processSource({ projectId, sourceId, text });
   } catch (error) {
-    await markFailed(projectId, sourceId, error);
+    await markFailed(projectId, sourceId, "process", error);
   }
 }

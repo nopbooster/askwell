@@ -3,6 +3,7 @@ import { EMBEDDING_DIMENSIONS } from "@askwell/shared";
 import { embedTexts } from "../ai";
 import { createServiceClient } from "../supabase/service";
 import { chunkText, MAX_CHUNKS_PER_SOURCE } from "./chunk";
+import { describeError } from "./errors";
 
 /** Same signature as `embedTexts` in `lib/ai`: one vector per text, in order. */
 export type EmbedFn = (texts: string[]) => Promise<number[][]>;
@@ -24,6 +25,8 @@ class StageError extends Error {
 /**
  * Turns a source's text into searchable chunks: chunk → embed → store → mark `ready`.
  * Any failure deletes this source's partial chunks and marks it `failed` (the result says why).
+ * A failure is logged with the source id, the step and the error's name and message only: never the
+ * text or a chunk.
  * Safe to re-run for the same source: it clears the source's old chunks first.
  *
  * SERVER ONLY, and it uses the service client: the caller (the knowledge routes) must have checked
@@ -54,7 +57,15 @@ export async function processSource(args: {
       .eq("project_id", projectId);
     if (error) throw new Error(`set ${status}: ${error.message}`);
   };
-  const fail = async (reason: Extract<ProcessResult, { status: "failed" }>["reason"]): Promise<ProcessResult> => {
+  const fail = async (
+    reason: Extract<ProcessResult, { status: "failed" }>["reason"],
+    cause?: unknown,
+  ): Promise<ProcessResult> => {
+    console.error("[knowledge] processing failed", {
+      sourceId,
+      step: reason,
+      ...(cause === undefined ? {} : { error: describeError(cause) }),
+    });
     await clearChunks();
     await setStatus("failed");
     return { status: "failed", reason };
@@ -95,6 +106,6 @@ export async function processSource(args: {
     }
     return { status: "ready", chunks: chunks.length, truncated };
   } catch (error) {
-    return fail(error instanceof StageError ? error.reason : "store_failed");
+    return error instanceof StageError ? fail(error.reason, error.cause) : fail("store_failed", error);
   }
 }

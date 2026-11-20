@@ -168,3 +168,55 @@ describe("processSource", () => {
     expect(statusOf(OTHER_S)).toBe("ready");
   });
 });
+
+describe("processSource failure log", () => {
+  const SECRET_TEXT = "Brightwick internal pricing note: do not log me.";
+  const logged = () => JSON.stringify(vi.mocked(console.error).mock.calls);
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    return () => vi.mocked(console.error).mockRestore();
+  });
+
+  it("an embedding failure logs the source id, the step and the error's name and message", async () => {
+    class AuthenticationError extends Error {
+      name = "AuthenticationError";
+    }
+    fakeEmbed.mockRejectedValueOnce(new AuthenticationError("401 Incorrect API key provided: sk-proj-****abcd"));
+    await processSource({ projectId: P, sourceId: S, text: `${SECRET_TEXT} ${longText}`, embed: fakeEmbed });
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith("[knowledge] processing failed", {
+      sourceId: S,
+      step: "embedding_failed",
+      error: { name: "AuthenticationError", message: "401 Incorrect API key provided: sk-[redacted]" },
+    });
+  });
+
+  it("an insert failure logs step store_failed", async () => {
+    failInsert = () => true;
+    await processSource({ projectId: P, sourceId: S, text: SECRET_TEXT, embed: fakeEmbed });
+    expect(console.error).toHaveBeenCalledWith("[knowledge] processing failed", {
+      sourceId: S,
+      step: "store_failed",
+      error: { name: "Error", message: "insert failed" },
+    });
+  });
+
+  it("no text logs step no_text without an error", async () => {
+    await processSource({ projectId: P, sourceId: S, text: " \n ", embed: fakeEmbed });
+    expect(console.error).toHaveBeenCalledWith("[knowledge] processing failed", { sourceId: S, step: "no_text" });
+  });
+
+  it("never logs the pasted text or a chunk", async () => {
+    fakeEmbed.mockRejectedValueOnce(new Error("openai down"));
+    await processSource({ projectId: P, sourceId: S, text: SECRET_TEXT, embed: fakeEmbed });
+    failInsert = () => true;
+    await processSource({ projectId: P, sourceId: S, text: SECRET_TEXT, embed: fakeEmbed });
+    expect(console.error).toHaveBeenCalledTimes(2);
+    expect(logged()).not.toContain("Brightwick");
+  });
+
+  it("a successful run logs nothing", async () => {
+    await processSource({ projectId: P, sourceId: S, text: SECRET_TEXT, embed: fakeEmbed });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});
